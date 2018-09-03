@@ -1,0 +1,33 @@
+ header = Sodium                                                                          
+ solid = F  potim =   2.0000000000000000     
+ volume =    5398.8888452591254     
+ atom types  Na
+ atom masses    22.989769280000001     
+ atom numbers         128
+ Density =   0.90508473577718163       g/cm^3
+ Number Density =    2.3708582204354775E-002  atoms/A^3
+ Average Temperature =    726.46111653995263     
+ Einstein frequencies =    2.7074630642977695       THz
+ Einstein frequencies =    90.3112467324901682166297289417694963        cm-1
+ Moments from trajectories
+       2nd moms(cm-1)    90.31125
+       Fourth moments   112.02050
+        Sixth moments   144.98944
+       Eighth moments   305.54602
+  
+ Self-diffusion coefficient (m^2/s)
+ Na   1.4830541290180562E-008 +-   1.8690971480545572E-009
+ Nernst-Einstein Conductivity =    899.91838270780420       S/m
+ Moments from Fourier transform of VACF
+       2nd moms(cm-1)    91.09740
+       Fourth moments   113.41108
+        Sixth moments   134.23461
+       Eighth moments   155.59698
+Delta:     0.60952
+gamma:     0.27432
+sqrt(Ag) (cm-1)              63.72490
+sqrt(Bg) (cm-1)             107.55107
+gas fractions:     0.35859
+Wa:    12.86423
+       Entropy          gas2          gas4          gasm         solid     total(Nk)  total(J/g/K)
+                     4.83476       4.83593       4.61300       5.31707       9.93007       3.59131

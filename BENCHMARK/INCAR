@@ -1,0 +1,124 @@
+# use PBEsol
+GGA = AM
+
+# recommended for GGA
+LASPH = .TRUE.
+
+# this should improve performance
+LREAL = AUTO
+
+# initialize with random coefficients for planewaves
+INIWAV = 1
+
+# read in WAVECAR and CHGCAR when available
+ISTART = 1
+ICHARG = 1
+
+# calculate pressure
+ISIF = 1
+
+# print out WAVECAR or CHGCAR
+LWAVE = .TRUE.
+LCHARG = .TRUE.
+
+# optimized by hand
+NPAR = 1
+
+# initialize the magnetic moments
+# MAGMOM = 4.0 4.0 4.0 4.0 4.0 4.0 4.0 4.0 56*0.0
+
+# set total magnetization
+# NUPDOWN = 32
+
+# use Fermi smearing
+ISMEAR = -1
+SIGMA = 0.0623007
+
+# system name is just a comment
+SYSTEM = Sodium
+
+# switch symmetrization off
+ISYM = 0
+
+# collinear spin-polarized calculation
+# ISPIN = 2
+
+# planewave cutoff energy, slightly reduced for MD
+ENCUT = 80.0
+
+#
+# MD parameters
+#
+
+# do MD
+IBRION = 0
+
+# maximum number of ionic steps
+NSW = 1000
+
+# time step in fs
+POTIM = 2.0
+
+# high accuracy for electronic density
+EDIFF = 1E-4
+
+# recommended in the manual
+GGA_COMPAT = .FALSE.
+
+# maximum number of electronic steps
+NELM = 300
+
+# Nose-Hoover thermostat parameters
+SMASS = -3
+TEIN  = 723.0
+TEBEG = 723.0
+TEEND = 723.0
+
+# print out coordinates to XDATCAR at every step
+NBLOCK = 1
+
+# get projections to site-centered spherical harmonics |lm>
+LORBIT        = 11
+
+# mixing parameters, these seem to work better than defaults
+# AMIX     = 0.2
+# BMIX     = 0.00001
+# AMIX_MAG = 0.8
+# BMIX_MAG = 0.00001
+
+#
+# LDA+U parameters
+#
+# LDAU = .TRUE.
+
+# use the Duradev approach
+# LDAUTYPE  = 2
+
+# for each species, specify l-quantum number for which the on-site U is used (Fe,Mg,O)
+# LDAUL     = 2 -1 -1
+
+# Parameters U and J. Only U-J matters, setting J=0 so that the
+# definition of U matches that of Cococcioni et al. (2005) and hence
+# Tsuchiya et al. (2006). Order is Fe,Mg,O.
+# LDAUU     = 2.50 0.00 0.00
+# LDAUJ     = 0.00 0.00 0.00
+
+# verbosity of LDA+U
+# LDAUPRINT = 2
+
+#
+# PAW parameters
+#
+
+# use PAW occupancies up to l=4 in the charge density mixer, this should
+# help with convergence
+LMAXMIX = 4
+
+# only spherical terms are evaluated on the site-centered radial grid
+# LMAXPAW = 0
+
+# reduce noice in forces
+# ENAUG = 1  ; ADDGRID = .TRUE.
+
+# recommended by VASP manual
+PREC = Normal
