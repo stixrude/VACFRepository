@@ -1,0 +1,8 @@
+        parameter (ratio = 2.0)
+	parameter (ntypmxp=10, nstepsp=11000, natomsp=1200, npacop=1000, nstepavp=nstepsp*(1.-1./ratio))
+        integer, parameter :: npmax=100
+C  VACF parameters
+	real, parameter :: potim = 2.0
+	integer, parameter :: mint = 6
+	integer, parameter :: nintmax = 1000
+	real, parameter :: dampfactor = 0.57735027
