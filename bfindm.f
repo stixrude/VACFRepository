@@ -14,7 +14,7 @@ C  initial guess
 
 	x(1) = Bg
 
-        print '(a20,99e12.5)', 'bfindm initial guess',Ag,Bg,fg
+c        print '(a20,99e12.5)', 'bfindm initial guess',Ag,Bg,fg
 
         call broydn(x,1,check)
 

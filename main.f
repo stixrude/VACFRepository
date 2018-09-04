@@ -22,7 +22,7 @@
 	parameter (gammax=0.545, iseed=5)
 c	parameter (mint=6)
 	real cof(mint),xut(mint),xold
-	logical, parameter :: solid=.false.
+c	logical, parameter :: solid=.false.
 c	real, parameter :: potim=2.0
 	pi = 4.0*atan(1.0)
 	dtime = potim
@@ -40,8 +40,10 @@ c	real, parameter :: potim=2.0
 	read(3,*) header
 	print*, 'header = ',header
 	write(12,*) 'header = ',header
-	print*, 'solid =',solid,' potim =',potim
-	write(12,*) 'solid =',solid,' potim =',potim
+	print*, 'Computational parameters'
+	print*, 'solid =',solid,' potim =',potim,' ratio =',ratio,' nintmax = ',nintmax,' mint =',mint,' dampfactor =',dampfactor
+	write(12,*) 'Computational parameters'
+	write(12,*) 'solid =',solid,' potim =',potim,' ratio =',ratio,' nintmax = ',nintmax,' mint =',mint,' dampfactor =',dampfactor
 	read(3,*) scale
         read(3,*) (at(i,1,1),i=1,3)
         read(3,*) (at(i,2,1),i=1,3)
@@ -267,14 +269,16 @@ C  Compute Temperature
 	 fmomx(5,ia) = fmomx(5,ia)*1.e7/(3.*Rgas*temp)/float(nseg+1)/float(natyp(ia))
 	 omega0(ia) = sqrt(fmomx(2,ia))
 144	continue
-	print*, 'Average kinetic energy = ',avke,' eV/atom'
-	print*, 'Average temperature = ',temp,' K'
-	print*, 'Center of mass velocity, kinetic energy, temperature = ',vcm,cmke,tempcm
-	print*, 'Einstein frequencies = ',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp),' THz'
-	print*, 'Einstein frequencies = ',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp),' cm-1'
-        write(12,*) 'Average Temperature = ',temp
-	write(12,*) 'Einstein frequencies = ',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp),' THz'
-	write(12,*) 'Einstein frequencies = ',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp),' cm-1'
+	print '(a27,f12.5)', 'Average kinetic energy (eV/atom)',avke
+	print '(a27,f12.5)', 'Average temperature (K) ',temp
+        pressureig = densitynum*1.e30*boltzk*temp*1.e-9
+        print '(a27,f12.5)', 'Ideal gas pressure (GPa)',pressureig
+c	print*, 'Center of mass velocity, kinetic energy, temperature = ',vcm,cmke,tempcm
+	print '(a27,f12.5)', 'Einstein frequencies (Thz)',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp)
+	print '(a27,f12.5)', 'Einstein frequencies (cm-1)',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp)
+        write(12,'(a27,f12.5)') 'Average Temperature (K)',temp
+	write(12,'(a27,f12.5)') 'Einstein frequencies (THz)',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp)
+	write(12,'(a27,f12.5)') 'Einstein frequencies (cm-1)',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp)
 	print*, 'Moments from trajectories'
         print '(a21,99f12.5)', '2nd moms(cm-1)',(fmomx(2,jtyp)**(1./2.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
         print '(a21,99f12.5)', 'Fourth moments',(fmomx(3,jtyp)**(1./4.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
@@ -285,8 +289,6 @@ C  Compute Temperature
         write(12,'(a21,99f12.5)') 'Fourth moments',(fmomx(3,jtyp)**(1./4.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
         write(12,'(a21,99f12.5)') 'Sixth moments', (fmomx(4,jtyp)**(1./6.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
         write(12,'(a21,99f12.5)') 'Eighth moments',(fmomx(5,jtyp)**(1./8.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
-        pressureig = densitynum*1.e30*boltzk*temp*1.e-9
-        print*, 'Ideal gas pressure = ',pressureig,' GPa'
 	if (pressureig .gt. bulksound) print*, 'WARNING: Way over the limit for periodic sound waves.  Try reducing nintegrate.'
 	if (pressureig .gt. bulksound) write(12,*) 'WARNING: Way over the limit for periodic sound waves.  Try reducing nintegrate.'
 
@@ -304,7 +306,7 @@ C  Compute Velocity Autocorrelation Function
 	corav = 0.
 C  Loop over intervals
 	do 15 int=iint,nnint,1
-	 if (mod(int,100) .eq. 0) print*, int
+	 if (mod(int,100) .eq. 0) print*, 'Computing vacf',int
 C  Loop over time origins
 	 do 16 istep=ibeg,nstep-int
          do 165 jtyp=1,ntyp
@@ -439,7 +441,7 @@ C  Compute parameters appearing in the exponential memory function theory of VAC
 	 tratio = wmass(jtyp)/Rgas/temp*1.e-3*diff(jtyp)*omega0(jtyp)/femto
 	 oratio = 1./(2.*omega1(jtyp)*taumem(jtyp))
 	 discr = 1. - 4.*omega0(jtyp)**2*taumem(jtyp)**2
-         write(12,*) atom(jtyp),diff(jtyp),'+-',sdiff(jtyp)
+         write(12,'(a5,e12.5,a3,e12.5)') atom(jtyp),diff(jtyp),'+-',sdiff(jtyp)
 31	continue
 
 	do 33 int=iint,nnint
@@ -465,7 +467,7 @@ C  Compute parameters appearing in the exponential memory function theory of VAC
          condne = condne + diff(ityp(iatom))*formz(ityp(iatom))**2
 32      continue
         condne = condne*elem*elem/(vol*1.e-30)/(1.3806e-23*temp)
-        write(12,*) 'Nernst-Einstein Conductivity = ',condne,' S/m'
+        write(12,'(a35,e12.5)') 'Nernst-Einstein Conductivity (Sm/m)',condne
 
 C  Calculcate Entropy.  cf. French and Desjarlais (2016) PRE.
 
@@ -494,8 +496,8 @@ C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text 
 432	  continue
 	  write(123,*) f/femto/cspeed,(fmom(imom,1),imom=1,5)
 43	continue
-	print*, 'Moments from Fourier transform of VACF'
 	print*, 'Sum rule check',(fmom(1,jtyp),jtyp=1,ntyp),((fmom(m,jtyp),m=1,5),jtyp=1,ntyp)
+	print*, 'Moments from Fourier transform of VACF'
 	print '(a21,99f12.5)', '2nd moms(cm-1)',(sign(1.,fmom(2,jtyp))*abs(fmom(2,jtyp))**(1./2.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
 	print '(a21,99f12.5)', 'Fourth moments',(sign(1.,fmom(3,jtyp))*abs(fmom(3,jtyp))**(1./4.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
 	print '(a21,99f12.5)', 'Sixth moments', (sign(1.,fmom(4,jtyp))*abs(fmom(4,jtyp))**(1./6.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
@@ -518,13 +520,13 @@ C  Compute theoretical VACF of the form sech(at)cos(bt) after Isbister and McQua
 	 C = fmom(3,jtyp)/fmom(2,jtyp)**2
 	 asec(jtyp) = 0.5*sqrt((C - 1.)*fmom(2,jtyp))
 	 bsec(jtyp) = asec(jtyp)*sqrt((5. - C)/(C - 1.))
-	 print*, C,asec(jtyp),bsec(jtyp),asec(jtyp)**2+bsec(jtyp)**2,fmom(2,jtyp)
-	 print*, 5.*asec(jtyp)**4 + 6.*asec(jtyp)**2*bsec(jtyp)**2 + bsec(jtyp)**4,fmom(3,jtyp)
+c	 print*, C,asec(jtyp),bsec(jtyp),asec(jtyp)**2+bsec(jtyp)**2,fmom(2,jtyp)
+c	 print*, 5.*asec(jtyp)**4 + 6.*asec(jtyp)**2*bsec(jtyp)**2 + bsec(jtyp)**4,fmom(3,jtyp)
 	 difsec = Rgas*temp/wmass(jtyp)*1.e3*pi/(2.*asec(jtyp))/cosh(pi*bsec(jtyp)/2.*asec(jtyp))*femto
-	 print*, 'sech diffusion coefficients',jtyp,difsec
+	 print '(a27,i5,e12.5)', 'sech diffusion coefficients',jtyp,difsec
 44	continue
-	print*, 'Delta:',(delta(jtyp),jtyp=1,ntyp)
-	write(12,'(a6,99f12.5)') 'Delta:',(delta(jtyp),jtyp=1,ntyp)
+	print '(a15,99f12.5)', 'Delta:',(delta(jtyp),jtyp=1,ntyp)
+	write(12,'(a15,99f12.5)') 'Delta:',(delta(jtyp),jtyp=1,ntyp)
 
         do 145 int=iint,nnint
          time = float(int)*potim
@@ -538,8 +540,8 @@ C  Find gamma by solving numerically Eq. 10.
 	do 45 jtyp=1,ntyp
 	 call gamfind(delta(jtyp),gamma(jtyp))
 45	continue
-	print*, 'gamma:',(gamma(jtyp),jtyp=1,ntyp)
-	write(12,'(a6,99f12.5)') 'gamma:',(gamma(jtyp),jtyp=1,ntyp)
+	print '(a15,99f12.5)', 'gamma:',(gamma(jtyp),jtyp=1,ntyp)
+	write(12,'(a15,99f12.5)') 'gamma:',(gamma(jtyp),jtyp=1,ntyp)
 
 	entgas2 = 0.
 	entgas4 = 0.
@@ -560,7 +562,7 @@ C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  Include i
 461	 fmom0(imom) = fmom(imom,jtyp)
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0.) then
 	  call bfind2(Ba(jtyp),Aa(jtyp),fgas(jtyp))
-	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
+c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
@@ -568,7 +570,7 @@ C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  Include i
 	 end if
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0. .and. fmom0(4) .gt. 0. .and. fmom0(5) .gt. 0.) then
 	  call bfind4(Ba(jtyp),Aa(jtyp),fgas(jtyp))
-	  print '(a15,i5,99e12.5)', 'bfind4',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
+c	  print '(a15,i5,99e12.5)', 'bfind4',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
@@ -596,18 +598,17 @@ c	go to 52
      &            + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &            + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
 	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom - xfrac*log(xfrac)
-	 print '(a15,i5,99e12.5)', 'bfindm',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp),Wa(jtyp),entgasm,gamma(jtyp)
+c	 print '(a15,i5,99e12.5)', 'bfindm',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp),Wa(jtyp),entgasm,gamma(jtyp)
 51	continue
 52	continue
-	print '(a15,99f22.5)', 'sqrt(Ag) (cm-1)',(sqrt(Aa(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
-	write(12,'(a15,99f22.5)') 'sqrt(Ag) (cm-1)',(sqrt(Aa(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
-	print '(a15,99f22.5)', 'sqrt(Bg) (cm-1)',(sqrt(Ba(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
-	write(12,'(a15,99f22.5)') 'sqrt(Bg) (cm-1)',(sqrt(Ba(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
-	print '(a14,99f12.5)', 'gas fractions:',(fgas(jtyp),jtyp=1,ntyp)
-	write(12,'(a14,99f12.5)') 'gas fractions:',(fgas(jtyp),jtyp=1,ntyp)
-	print '(a3,99f12.5)', 'Wa:',(Wa(jtyp),jtyp=1,ntyp)
-	write(12,'(a3,99f12.5)') 'Wa:',(Wa(jtyp),jtyp=1,ntyp)
-	print '(a49,3f12.5,a3)', 'Gas entropy (2 moments, 4 moments, tail match) = ',entgas2,entgas4,entgasm,' Nk'
+	print '(a15,99f12.5)', 'sqrt(Ag) (cm-1)',(sqrt(Aa(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
+	write(12,'(a15,99f12.5)') 'sqrt(Ag) (cm-1)',(sqrt(Aa(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
+	print '(a15,99f12.5)', 'sqrt(Bg) (cm-1)',(sqrt(Ba(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
+	write(12,'(a15,99f12.5)') 'sqrt(Bg) (cm-1)',(sqrt(Ba(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
+	print '(a15,99f12.5)', 'gas fractions',(fgas(jtyp),jtyp=1,ntyp)
+	write(12,'(a15,99f12.5)') 'gas fractions:',(fgas(jtyp),jtyp=1,ntyp)
+	print '(a15,99f12.5)', 'Wa',(Wa(jtyp),jtyp=1,ntyp)
+	write(12,'(a15,99f12.5)') 'Wa',(Wa(jtyp),jtyp=1,ntyp)
 C  Prefer high frequency matching method of computing gas-like VDOS.
 	entgas = entgasm
 
@@ -630,18 +631,19 @@ C  Compute gas VDOS Eq. 12 French et al. (2016)
 c         write(17,*) f/femto/cspeed,(z(i,jtyp),jtyp=1,ntyp),(fgas(jtyp)*zgas(i,jtyp),jtyp=1,ntyp)
          write(17,*) f/femto*1.e-12,(fgas(jtyp)*zgas(i,jtyp)/4.,jtyp=1,ntyp)
 47	continue
-	print*, 'Test: recalculate moments of gas portion of VDOS'
-        print '(a21,99e12.5)', '2nd moms      ',(sign(1.,fmom(2,jtyp))*abs(fmom(2,jtyp))**(1./1.),jtyp=1,ntyp)
-     &,Aa(1)
-        print '(a21,99e12.5)', 'Fourth moments',(sign(1.,fmom(3,jtyp))*abs(fmom(3,jtyp))**(1./1.),jtyp=1,ntyp)
-     &,(Aa(1)**2+2.*Aa(1)*Ba(1))
-        print '(a21,99e12.5)', 'Sixth moments', (sign(1.,fmom(4,jtyp))*abs(fmom(4,jtyp))**(1./1.),jtyp=1,ntyp)
-     &,(Aa(1)**3 + 4.*Aa(1)**2*Ba(1) + 12.*Aa(1)*Ba(1)**2)
-        print '(a21,99e12.5)', 'Eighth moments',(sign(1.,fmom(5,jtyp))*abs(fmom(5,jtyp))**(1./1.),jtyp=1,ntyp)
-     &,(Aa(1)**4 + 6.*Aa(1)**3*Ba(1) + 28.*Aa(1)**2*Ba(1)**2 + 120.*Aa(1)*Ba(1)**3)
+c	print*, 'Test: recalculate moments of gas portion of VDOS'
+c        print '(a21,99e12.5)', '2nd moms      ',(sign(1.,fmom(2,jtyp))*abs(fmom(2,jtyp))**(1./1.),jtyp=1,ntyp)
+c     &,Aa(1)
+c        print '(a21,99e12.5)', 'Fourth moments',(sign(1.,fmom(3,jtyp))*abs(fmom(3,jtyp))**(1./1.),jtyp=1,ntyp)
+c     &,(Aa(1)**2+2.*Aa(1)*Ba(1))
+c        print '(a21,99e12.5)', 'Sixth moments', (sign(1.,fmom(4,jtyp))*abs(fmom(4,jtyp))**(1./1.),jtyp=1,ntyp)
+c     &,(Aa(1)**3 + 4.*Aa(1)**2*Ba(1) + 12.*Aa(1)*Ba(1)**2)
+c        print '(a21,99e12.5)', 'Eighth moments',(sign(1.,fmom(5,jtyp))*abs(fmom(5,jtyp))**(1./1.),jtyp=1,ntyp)
+c     &,(Aa(1)**4 + 6.*Aa(1)**3*Ba(1) + 28.*Aa(1)**2*Ba(1)**2 + 120.*Aa(1)*Ba(1)**3)
 
 C  Compute solid entropy Eqs. 4,5,6
 	entsol = 0.
+	theta0 = 0.
 	do 49 i=1,nfreq
          f = df*float(i-1)
 	 x = hplanck*f/(boltzk*temp)/femto
@@ -651,15 +653,17 @@ C  Compute solid entropy Eqs. 4,5,6
 	 do 50 jtyp=1,ntyp
 	  zsol(i,jtyp) = (z(i,jtyp) - fgas(jtyp)*zgas(i,jtyp))/(1. - fgas(jtyp))
 	  entsol = entsol + (1. - fgas(jtyp))*zsol(i,jtyp)*Ws*df*natyp(jtyp)/natom
+          if (f .gt.  0.) theta0 = theta0 + zsol(i,jtyp)*log(f)*df*natyp(jtyp)/natom
 c	  if (jtyp .eq. 1) write(12,*) f/femto/cspeed,Ws,zsol(i,jtyp),entsol
 50	 continue
 49	continue
-	print*, 'Solid entropy',entsol,' Nk'
+        print '(a44,f12.5)', 'Zeroth (Debye) moment of solid VDOS (cm-1) ',exp(1./3.)*exp(theta0)/femto/cspeed
+        write(12,'(a44,f12.5)') 'Zeroth (Debye) moment of solid VDOS (cm-1) ',exp(1./3.)*exp(theta0)/femto/cspeed
 
 C  Compute total entropy
 	ent = entgas + entsol
-	print*, 'Total entropy',ent,' Nk'
-	print*, 'Total entropy',ent/cellmass*Rgas*natom,' J/g/K'
+	print '(99a14)', 'Entropy','gas2','gas4','gasm','solid','total(Nk)','total(J/g/K)'
+	print '(14x,99f14.5)', entgas2,entgas4,entgasm,entsol,ent,ent/cellmass*Rgas*natom
 	write (12,'(99a14)') 'Entropy','gas2','gas4','gasm','solid','total(Nk)','total(J/g/K)'
 	write(12,'(14x,99f14.5)') entgas2,entgas4,entgasm,entsol,ent,ent/cellmass*Rgas*natom
 

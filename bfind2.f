@@ -16,7 +16,7 @@ C  initial guess
 	x(1) = Bg
 	x(2) = As
 
-        print '(a20,99e12.5)', 'bfind2 initial guess',Ag,Bg,fg,As,fg*Ag+(1.-fg)*As,fmom0(2)
+c        print '(a20,99e12.5)', 'bfind2 initial guess',Ag,Bg,fg,As,fg*Ag+(1.-fg)*As,fmom0(2)
 
 	call broydn(x,1,check)
 

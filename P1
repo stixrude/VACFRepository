@@ -6,3 +6,4 @@ C  VACF parameters
 	integer, parameter :: mint = 6
 	integer, parameter :: nintmax = 1000
 	real, parameter :: dampfactor = 0.57735027
+	logical, parameter :: solid = .FALSE.
