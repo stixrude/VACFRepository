@@ -20,12 +20,14 @@
 	parameter (evk = 11605., elem=1.6021766208e-19)
 	parameter (femto=1.e-15)
 	parameter (gammax=0.545, iseed=5)
-c	parameter (mint=6)
+        parameter (Wavenumbers=1./femto/cspeed)
+        parameter (THz=1./femto*1.e-12)
 	real cof(mint),xut(mint),xold
-c	logical, parameter :: solid=.false.
-c	real, parameter :: potim=2.0
 	pi = 4.0*atan(1.0)
 	dtime = potim
+	freqconversion = Wavenumbers
+	if (LTHz) freqconversion = THz
+	print*, 'frequency conversion = ',freqconversion
 
 	open(3,file='VDATCAR',status='old',iostat=ios)
 	if (ios .ne. 0) then
@@ -36,6 +38,7 @@ c	real, parameter :: potim=2.0
 	open(121,file='vacf.txt',status='unknown')
 	open(13,file='vdos.txt',status='unknown')
 	open(17,file='vgas.txt',status='unknown')
+	open(122,file='damp.txt',status='unknown')
 
 	read(3,*) header
 	print*, 'header = ',header
@@ -124,7 +127,7 @@ c	real, parameter :: potim=2.0
 	print*, 'Cell mass = ',cellmass
 	nstep = 0
 	do 151 istep=1,nstepsp
-	 read(3,'(a80)',end=1213) lab
+	 read(3,*,end=1213) lab
 	 if (lab .eq. header) then
 	  print*, istep,lab
 	  call skip(3,7,ierr)
@@ -142,10 +145,10 @@ c	real, parameter :: potim=2.0
 	print*, 'coordinates read in',nstep
 	ibeg = nstep/ratio
 	nseg = nstep - ibeg
-c  limit range of integration over time intervals because vacf becomes increasingly noisy at large intervals
+c  By setting nintmax to a large number full range to maximimize spectral resolution.  Take care of increasing noise in vacf at large intervals with damping
 	nintegrate = min(nintmax,nseg)
 C  Analyze nintegrate in terms of the periodic propagation of sound waves (cf. Haile, "Molecular Dynamics Simulation", Wiley, 1992, pg. 86, eq. 2.115)
-	sound = 0.001*(vol)**(1./3.)*1.e-10/(potim*nintegrate*femto)
+	sound = 0.001*(vol)**(1./3.)*1.e-10/(potim*dampfactor*femto)
 	bulksound = sound**2*density
 	print*, 'Sound speed must be smaller than this value to avoid periodic sound waves = ',sound,' km/s'
 	print*, 'Adiabatic bulk modulus must be smaller than this value to avoid periodic sound waves = ',bulksound,' GPa'
@@ -253,6 +256,16 @@ C  Compute Temperature
 137	 continue
          if (istep .gt. ibeg .and. avke1 .gt. 10.*avke*float(nseg+1)/float(istep-ibeg+1)) then
           print*, 'Anomalous velocities',istep,avke*float(nseg+1)/float(istep-ibeg+1),avke1
+          write(12,*) 'Anomalous velocities',istep,avke*float(nseg+1)/float(istep-ibeg+1),avke1
+	  anommax = -1.e15
+	  ianom = natom+1
+	  do 1371 iatom=1,natom
+	   anom = 0.5*wmass(ityp(iatom))*vt(istep,iatom,j)**2
+	   anommax = max(anommax,anom)
+	   if (anom .eq. anommax) ianom = iatom
+1371	  continue
+	  print*, 'Most anomalous atom = ',ianom,(xt(istep,ianom,j),j=1,3)
+	  write(12,*) 'Most anomalous atom = ',ianom,(xt(istep,ianom,j),j=1,3),(xt(istep-1,ianom,j),j=1,3)
          end if
 136	continue
 	do 143 j=1,3
@@ -274,11 +287,11 @@ C  Compute Temperature
         pressureig = densitynum*1.e30*boltzk*temp*1.e-9
         print '(a27,f12.5)', 'Ideal gas pressure (GPa)',pressureig
 c	print*, 'Center of mass velocity, kinetic energy, temperature = ',vcm,cmke,tempcm
-	print '(a27,f12.5)', 'Einstein frequencies (Thz)',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp)
-	print '(a27,f12.5)', 'Einstein frequencies (cm-1)',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp)
+	print '(a27,99f12.5)', 'Einstein frequencies (Thz)',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp)
+	print '(a27,99f12.5)', 'Einstein frequencies (cm-1)',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp)
         write(12,'(a27,f12.5)') 'Average Temperature (K)',temp
-	write(12,'(a27,f12.5)') 'Einstein frequencies (THz)',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp)
-	write(12,'(a27,f12.5)') 'Einstein frequencies (cm-1)',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp)
+	write(12,'(a27,99f12.5)') 'Einstein frequencies (THz)',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp)
+	write(12,'(a27,99f12.5)') 'Einstein frequencies (cm-1)',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp)
 	print*, 'Moments from trajectories'
         print '(a21,99f12.5)', '2nd moms(cm-1)',(fmomx(2,jtyp)**(1./2.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
         print '(a21,99f12.5)', 'Fourth moments',(fmomx(3,jtyp)**(1./4.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
@@ -289,7 +302,8 @@ c	print*, 'Center of mass velocity, kinetic energy, temperature = ',vcm,cmke,tem
         write(12,'(a21,99f12.5)') 'Fourth moments',(fmomx(3,jtyp)**(1./4.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
         write(12,'(a21,99f12.5)') 'Sixth moments', (fmomx(4,jtyp)**(1./6.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
         write(12,'(a21,99f12.5)') 'Eighth moments',(fmomx(5,jtyp)**(1./8.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
-	if (pressureig .gt. bulksound) print*, 'WARNING: Way over the limit for periodic sound waves.  Try reducing nintegrate.'
+	if (pressureig .gt. bulksound) print '(a53,a29,i5,a3,i5)', 'WARNING: Way over the limit for periodic sound waves.',
+     & 'Try reducing dampfactor from',nint(dampfactor),' to',nint(dampfactor*bulksound/pressureig)
 	if (pressureig .gt. bulksound) write(12,*) 'WARNING: Way over the limit for periodic sound waves.  Try reducing nintegrate.'
 
 C  Compute Velocity Autocorrelation Function
@@ -306,7 +320,7 @@ C  Compute Velocity Autocorrelation Function
 	corav = 0.
 C  Loop over intervals
 	do 15 int=iint,nnint,1
-	 if (mod(int,100) .eq. 0) print*, 'Computing vacf',int
+	 if (mod(int,100) .eq. 0) write(6,'(a14,i5,a)',ADVANCE='NO') 'Computing vacf',int,' '//CHAR(13)
 C  Loop over time origins
 	 do 16 istep=ibeg,nstep-int
          do 165 jtyp=1,ntyp
@@ -377,11 +391,9 @@ C  N>M and must be a power of 2.  Recommendation is N>4M (comment immediately pr
 	ndft = log(float(nintegrate))/log(2.) + 3
 	ndft = 2**ndft
 	if (ndft .gt. nstepsp) ndft = ndft/2
-	print*, 'nintegrate,ndft = ',nintegrate,ndft
-C  Gaussian damping prescription from http://cacs.usc.edu/education/phys516/VAC.pdf
-c	damp = nintegrate*potim/sqrt(3.)
-	damp = nintegrate*potim*dampfactor
-c	damp = 1.e15
+	print*, 'nintegrate,ndft,nfreq = ',nintegrate,ndft,nfreq
+C  Gaussian damping defined so that damping=0.1 at t=dampfactor
+	damp = potim*dampfactor/sqrt(log(10.))
 	call srand(iseed)
 	do 223 int=iint,nnint
          time = float(int)*potim
@@ -395,6 +407,7 @@ C	  vacf(int+1,jtyp) = exp(-0.5*omega0(jtyp)**2*time**2) + errav(int+1)*gasdev(i
 226	  continue
 224	 continue
 	 write(124,*) time,(vacf(int+1,jtyp),jtyp=1,ntyp),(dvacf(int+1,jtyp),jtyp=1,ntyp)
+	 write(122,*) time,exp(-(time/damp)**2)
 223	continue
 	do 2231 jtyp=1,ntyp
 	 if (dvacf(nintegrate,jtyp) .gt. errav(nintegrate)) print*, 'WARNING: Damping exceeds uncertainty.  Consider changing nintegrate.'
@@ -408,7 +421,7 @@ C	  vacf(int+1,jtyp) = exp(-0.5*omega0(jtyp)**2*time**2) + errav(int+1)*gasdev(i
 	 do 1 j=1,nfreq
 	  f = df*float(j-1)
 	  freq = f
-          if (mod(j,100) .eq. 0) print*, jtyp,j
+          if (mod(j,100) .eq. 0) write(6,'(a23,2i5,a)',ADVANCE='NO') 'Computing VDOS for type',jtyp,j,' '//CHAR(13)
 	  z(j,jtyp) = 0.
 	  init = 1
 	  if (j .eq. 1) init = 0
@@ -417,9 +430,9 @@ C	  vacf(int+1,jtyp) = exp(-0.5*omega0(jtyp)**2*time**2) + errav(int+1)*gasdev(i
 222	continue
 	do 225 j=1,nfreq
 	 f = df*float(j-1)
-C Compare with model gaussian vacf with the same second moment as that of the MD simulation
-	 write(13,*) f/femto*1.e-12,(z(j,jtyp),jtyp=1,ntyp)
-     &    ,(sqrt(pi/2.)/omega0(jtyp)*exp(-(2.*pi*f)**2/2./omega0(jtyp)**2),jtyp=1,ntyp)
+C Optionally (coption) Compare with model gaussian vacf with the same second moment as that of the MD simulation
+	 write(13,*) f*freqconversion,(z(j,jtyp),jtyp=1,ntyp)
+coption     &    ,(sqrt(pi/2.)/omega0(jtyp)*exp(-(2.*pi*f)**2/2./omega0(jtyp)**2),jtyp=1,ntyp)
 225	continue
 
 	write(12,*) ' '
@@ -477,8 +490,7 @@ C  Normalize z_jtyp.  Eq. (1).
 	  z(i,jtyp) = 4.*z(i,jtyp)
 42	 continue
          f = df*float(i-1)
-c	 write(16,*) f/femto/cspeed,(z(i,jtyp),jtyp=1,ntyp)
-	 write(16,*) f/femto*1.e-12,(z(i,jtyp)/4.,jtyp=1,ntyp)
+	 write(16,*) f*freqconversion,(z(i,jtyp)/4.,jtyp=1,ntyp)
 41	continue
 
 C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text following Eq. 21 in Desjarlais (2013): M_2n = <omega^(2n)>.
@@ -494,7 +506,7 @@ C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text 
 	  do 432 imom=1,5
 	   fmom(imom,jtyp) = fmom(imom,jtyp) + zfac*fac*z(i,jtyp)*(2.*pi*f)**(2.*(imom-1))*df
 432	  continue
-	  write(123,*) f/femto/cspeed,(fmom(imom,1),imom=1,5)
+	  write(123,*) f*freqconversion,(fmom(imom,1),imom=1,5)
 43	continue
 	print*, 'Sum rule check',(fmom(1,jtyp),jtyp=1,ntyp),((fmom(m,jtyp),m=1,5),jtyp=1,ntyp)
 	print*, 'Moments from Fourier transform of VACF'
@@ -516,6 +528,10 @@ C  Use moments computed from trajectory
 	 if (fmomx(3,jtyp) .gt. 0.) fmom(3,jtyp) = fmomx(3,jtyp)
 	 if (fmomx(4,jtyp) .gt. 0.) fmom(4,jtyp) = fmomx(4,jtyp)
 	 if (fmomx(5,jtyp) .gt. 0.) fmom(5,jtyp) = fmomx(5,jtyp)
+	 fmom(2,jtyp) = fmomx(2,jtyp)
+	 fmom(3,jtyp) = fmomx(3,jtyp)
+	 fmom(4,jtyp) = fmomx(4,jtyp)
+	 fmom(5,jtyp) = fmomx(5,jtyp)
 C  Compute theoretical VACF of the form sech(at)cos(bt) after Isbister and McQuarrie (1972) J. Chem. Phys. 56, 736.
 	 C = fmom(3,jtyp)/fmom(2,jtyp)**2
 	 asec(jtyp) = 0.5*sqrt((C - 1.)*fmom(2,jtyp))
@@ -524,6 +540,7 @@ c	 print*, C,asec(jtyp),bsec(jtyp),asec(jtyp)**2+bsec(jtyp)**2,fmom(2,jtyp)
 c	 print*, 5.*asec(jtyp)**4 + 6.*asec(jtyp)**2*bsec(jtyp)**2 + bsec(jtyp)**4,fmom(3,jtyp)
 	 difsec = Rgas*temp/wmass(jtyp)*1.e3*pi/(2.*asec(jtyp))/cosh(pi*bsec(jtyp)/2.*asec(jtyp))*femto
 	 print '(a27,i5,e12.5)', 'sech diffusion coefficients',jtyp,difsec
+	 write(12,'(a27,i5,e12.5)') 'sech diffusion coefficients',jtyp,difsec
 44	continue
 	print '(a15,99f12.5)', 'Delta:',(delta(jtyp),jtyp=1,ntyp)
 	write(12,'(a15,99f12.5)') 'Delta:',(delta(jtyp),jtyp=1,ntyp)
@@ -548,7 +565,9 @@ C  Find gamma by solving numerically Eq. 10.
 	entgasm = 0.
 C  Find Ag, Bg, and fg from moments.  For two moment solution (bfind2) use Eqs. 19,20,28 of Desjarlais (2013) PRE.  For four moment solution (bfind4) use Eqs. 19,20,30 of same.
 C  Having found fg, calculate W (Eqs. 7,8) and therefore the gas contribution to the entropy (Eq. 5).  For the ideal gas portion, assume that N_alpha/V_alpha = N/V, 
-C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  Include ideal mixing term: Eq. 13b of Lai et al.
+C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  Note that the ideal mixing contribution is already included in the expression for the ideal gas entropy
+C  that we use (French et al., 2016, Eq. 8) and so the entropy of mixing term does not need to be added as in Lai et al. (2012) PCCP Eq. 13b.
+	SIG = 0.
 	do 46 jtyp=1,ntyp
 	 Ba(jtyp) = fmom(2,jtyp)
 	 if (solid) go to 46
@@ -558,6 +577,7 @@ C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  Include i
 	 call bcalc(Aa(jtyp),Ba(jtyp),fgas(jtyp))
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
 	 xfrac = float(natyp(jtyp))/float(natom)
+	 SIG = SIG + xfrac*(2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)))
 	 do 461 imom=1,5
 461	 fmom0(imom) = fmom(imom,jtyp)
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0.) then
@@ -566,15 +586,19 @@ c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
-	  entgas2 = entgas2 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom - xfrac*log(xfrac)
+	  entgas2 = entgas2 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
+	 else
+	   print*, 'Skipping 2 moment procedure'
 	 end if
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0. .and. fmom0(4) .gt. 0. .and. fmom0(5) .gt. 0.) then
 	  call bfind4(Ba(jtyp),Aa(jtyp),fgas(jtyp))
-c	  print '(a15,i5,99e12.5)', 'bfind4',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
+	  print '(a15,i5,99e12.5)', 'bfind4',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
-	  entgas4 = entgas4 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom - xfrac*log(xfrac)
+	  entgas4 = entgas4 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
+	 else
+	   print*, 'Skipping 4 moment procedure'
 	 end if
 46	continue
 C  Find Ag, Bg, and fg so that the high frequency tail of the gas-like component matches the total density of states.  
@@ -597,7 +621,7 @@ c	go to 52
 	 Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natom*fgas(jtyp)) 
      &            + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &            + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
-	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom - xfrac*log(xfrac)
+	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
 c	 print '(a15,i5,99e12.5)', 'bfindm',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp),Wa(jtyp),entgasm,gamma(jtyp)
 51	continue
 52	continue
@@ -628,44 +652,46 @@ C  Compute gas VDOS Eq. 12 French et al. (2016)
 	   fmom(imom,jtyp) = fmom(imom,jtyp) + zgas(i,jtyp)*(2.*pi*f)**(2.*(imom-1))*df
 532	  continue
 48	 continue
-c         write(17,*) f/femto/cspeed,(z(i,jtyp),jtyp=1,ntyp),(fgas(jtyp)*zgas(i,jtyp),jtyp=1,ntyp)
-         write(17,*) f/femto*1.e-12,(fgas(jtyp)*zgas(i,jtyp)/4.,jtyp=1,ntyp)
+         write(17,*) f*freqconversion,(fgas(jtyp)*zgas(i,jtyp)/4.,jtyp=1,ntyp)
 47	continue
-c	print*, 'Test: recalculate moments of gas portion of VDOS'
-c        print '(a21,99e12.5)', '2nd moms      ',(sign(1.,fmom(2,jtyp))*abs(fmom(2,jtyp))**(1./1.),jtyp=1,ntyp)
-c     &,Aa(1)
-c        print '(a21,99e12.5)', 'Fourth moments',(sign(1.,fmom(3,jtyp))*abs(fmom(3,jtyp))**(1./1.),jtyp=1,ntyp)
-c     &,(Aa(1)**2+2.*Aa(1)*Ba(1))
-c        print '(a21,99e12.5)', 'Sixth moments', (sign(1.,fmom(4,jtyp))*abs(fmom(4,jtyp))**(1./1.),jtyp=1,ntyp)
-c     &,(Aa(1)**3 + 4.*Aa(1)**2*Ba(1) + 12.*Aa(1)*Ba(1)**2)
-c        print '(a21,99e12.5)', 'Eighth moments',(sign(1.,fmom(5,jtyp))*abs(fmom(5,jtyp))**(1./1.),jtyp=1,ntyp)
-c     &,(Aa(1)**4 + 6.*Aa(1)**3*Ba(1) + 28.*Aa(1)**2*Ba(1)**2 + 120.*Aa(1)*Ba(1)**3)
 
 C  Compute solid entropy Eqs. 4,5,6
 	entsol = 0.
+	entsolpure = 0.
 	theta0 = 0.
+	tnorm0 = 0.
 	do 49 i=1,nfreq
          f = df*float(i-1)
 	 x = hplanck*f/(boltzk*temp)/femto
 	 Ws = 0.
 	 if (f .gt. 0.) Ws = 3.*(x/(exp(x) - 1.) - log(1. - exp(-x)))
-	 write(125,*) f/femto/cspeed,x,Ws,(Wa(jtyp),jtyp=1,ntyp)
+	 write(125,*) f*freqconversion,x,Ws,(Wa(jtyp),jtyp=1,ntyp)
 	 do 50 jtyp=1,ntyp
 	  zsol(i,jtyp) = (z(i,jtyp) - fgas(jtyp)*zgas(i,jtyp))/(1. - fgas(jtyp))
 	  entsol = entsol + (1. - fgas(jtyp))*zsol(i,jtyp)*Ws*df*natyp(jtyp)/natom
+	  entsolpure = entsolpure + zsol(i,jtyp)*Ws*df*natyp(jtyp)/natom
           if (f .gt.  0.) theta0 = theta0 + zsol(i,jtyp)*log(f)*df*natyp(jtyp)/natom
-c	  if (jtyp .eq. 1) write(12,*) f/femto/cspeed,Ws,zsol(i,jtyp),entsol
+          if (f .gt.  0.) tnorm0 = tnorm0 + zsol(i,jtyp)*df*natyp(jtyp)/natom
 50	 continue
 49	continue
-        print '(a44,f12.5)', 'Zeroth (Debye) moment of solid VDOS (cm-1) ',exp(1./3.)*exp(theta0)/femto/cspeed
-        write(12,'(a44,f12.5)') 'Zeroth (Debye) moment of solid VDOS (cm-1) ',exp(1./3.)*exp(theta0)/femto/cspeed
+        print '(a44,99f12.5)', 'Zeroth moment of solid VDOS (cm-1,K)',exp(theta0)*Wavenumbers,exp(theta0)*Wavenumbers*hcok
+        write(12,'(a44,99f12.5)') 'Zeroth moment of solid VDOS (cm-1,K)',exp(theta0)*Wavenumbers,exp(theta0)*Wavenumbers*hcok
+
+	fgasmean = 0.
+	do 61 jtyp=1,ntyp
+	 fgasmean = fgasmean + fgas(jtyp)/float(ntyp)
+61	continue
 
 C  Compute total entropy
 	ent = entgas + entsol
-	print '(99a14)', 'Entropy','gas2','gas4','gasm','solid','total(Nk)','total(J/g/K)'
-	print '(14x,99f14.5)', entgas2,entgas4,entgasm,entsol,ent,ent/cellmass*Rgas*natom
-	write (12,'(99a14)') 'Entropy','gas2','gas4','gasm','solid','total(Nk)','total(J/g/K)'
-	write(12,'(14x,99f14.5)') entgas2,entgas4,entgasm,entsol,ent,ent/cellmass*Rgas*natom
+	print '(a12,99a16)', 'Entropy (Nk)','gas2','gasm','solid','solid/(1-fgas)','fgasmean','solidpure'
+     &   ,'Ideal Gas','-Excess','Total','Total(J/g/K)'
+	print '(12x,99f16.5)', entgas2,entgasm,entsol,entsol/(1.-fgasmean),fgasmean,entsolpure
+     &   ,SIG,SIG-ent,ent,ent/cellmass*Rgas*natom
+	write(12,'(a12,99a16)') 'Entropy (Nk)','gas2','gasm','solid','solid/(1-fgas)','fgasmean','solidpure'
+     &   ,'Ideal Gas','-Excess','Total','Total(J/g/K)'
+	write(12,'(12x,99f16.5)') entgas2,entgasm,entsol,entsol/(1.-fgasmean),fgasmean,entsolpure
+     &   ,SIG,SIG-ent,ent,ent/cellmass*Rgas*natom
 
 	stop
 	end
