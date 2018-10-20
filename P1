@@ -6,7 +6,7 @@ C Needed by const.inc for unit matrix dimensions etc.
         integer, parameter :: npmax=100
 C Parameters controlling the computation of the Velocity Autocorrelation Function (VACF)
 C     time step
-	real, parameter :: potim = 2.0
+	real, parameter :: potim = 1.0
 C     order of polynomial interpolation of trajectory from which velocities are computed
 	integer, parameter :: mint = 4
 C     maxmimum number of time steps in VACF.  Note: you want this to be equal to the full time series in order to maximize spectral resolution.
