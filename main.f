@@ -5,7 +5,7 @@
 	character*2 atom(ntypmxp)
 	integer natyp(ntypmxp),ityp(natomsp),nchar(100)
 	real a(3,3),at(3,3,nstepsp),volt(nstepsp)
-	real xt(nstepsp,natomsp,3),wmass(ntypmxp)
+	real xt(nstepsp,natomsp,3),wmass(ntypmxp),vatyp(ntypmxp)
 	real vt(nstepsp,natomsp,3),vacf(nstepsp,ntypmxp),vacf0(ntypmxp),vacfx0(ntypmxp,3),z(nstepsp,ntypmxp)
 	real sigvacf(nstepsp,ntypmxp),vacfint(nstepsp,ntypmxp),vacfmean(nstepsp,ntypmxp)
 	real vacfx(nstepsp,ntypmxp,3),zx(nstepsp,ntypmxp,3),dvacf(nstepsp,ntypmxp)
@@ -108,18 +108,20 @@
         iityp = 1
         nasum = natyp(iityp)
         do 14 i=1,natom
-          if (i .le. nasum) then
-           ityp(i) = iityp
-          else
-           iityp = iityp + 1
-           nasum = nasum + natyp(iityp)
-           ityp(i) = iityp
-          end if
+         if (i .le. nasum) then
+          ityp(i) = iityp
+         else
+          iityp = iityp + 1
+          nasum = nasum + natyp(iityp)
+          ityp(i) = iityp
+         end if
 14      continue
 	print*, 'total number of atoms = ',natom
 	cellmass = 0.
 	do 21 i=1,ntyp
 	 cellmass = cellmass + natyp(i)*wmass(i)
+C  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
+	 vatyp(i) = volt(1)*natyp(i)/natom
 21	continue
         do 22 iatom=1,natom
          formz(iatom) = formzfunc(atom(ityp(iatom)))
@@ -282,7 +284,7 @@ C  Compute Temperature
 	 fmomx(5,ia) = fmomx(5,ia)*1.e7/(3.*Rgas*temp)/float(nseg+1)/float(natyp(ia))
 	 omega0(ia) = sqrt(fmomx(2,ia))
 144	continue
-	print '(a27,f12.5)', 'Average kinetic energy (eV/atom)',avke
+	print '(a32,f12.5)', 'Average kinetic energy (eV/atom)',avke
 	print '(a27,f12.5)', 'Average temperature (K) ',temp
         pressureig = densitynum*1.e30*boltzk*temp*1.e-9
         print '(a27,f12.5)', 'Ideal gas pressure (GPa)',pressureig
@@ -520,9 +522,10 @@ C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text 
 	write(12,'(a21,99f12.5)') 'Sixth moments', (sign(1.,fmom(4,jtyp))*abs(fmom(4,jtyp))**(1./6.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
 	write(12,'(a21,99f12.5)') 'Eighth moments',(sign(1.,fmom(5,jtyp))*abs(fmom(5,jtyp))**(1./8.)/(2.*pi*femto*cspeed),jtyp=1,ntyp)
 
-C  Calculate normalized diffusivity, Delta.  Eq. 11.  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
+C  Calculate normalized diffusivity, Delta.  Eq. 11 frenchetal_16.  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
 	do 44 jtyp=1,ntyp
-	 delta(jtyp) = 2./3.*z(1,jtyp)*femto*sqrt(pi*boltzk*temp/(wmass(jtyp)/1000./avn))*(natom/vol)**(1./3.)*(6./pi)**(2./3.)*1.e10
+	 delta(jtyp) = 2./3.*z(1,jtyp)*femto*sqrt(pi*boltzk*temp/(wmass(jtyp)/1000./avn))*(natyp(jtyp)/vatyp(jtyp))**(1./3.)
+     &     *(6./pi)**(2./3.)*1.e10
 C  Use moments computed from trajectory
 	 if (fmomx(2,jtyp) .gt. 0.) fmom(2,jtyp) = fmomx(2,jtyp)
 	 if (fmomx(3,jtyp) .gt. 0.) fmom(3,jtyp) = fmomx(3,jtyp)
@@ -553,6 +556,15 @@ c	 print*, 5.*asec(jtyp)**4 + 6.*asec(jtyp)**2*bsec(jtyp)**2 + bsec(jtyp)**4,fmo
 	 write(141,*) time,(vacfmem(jtyp),jtyp=1,ntyp)
 145	continue
 
+	if (solid) then
+	 print*, 'Assuming fgas=0, skipping computation of gamma, Ag, Bg, Wa'
+	 write(12,*) 'Assuming fgas=0, skipping computation of gamma, Ag, Bg, Wa'
+	 do 534 jtyp=1,ntyp
+	  fgas(jtyp) = 0.
+534	 continue
+	 go to 533
+	end if
+
 C  Find gamma by solving numerically Eq. 10.
 	do 45 jtyp=1,ntyp
 	 call gamfind(delta(jtyp),gamma(jtyp))
@@ -565,12 +577,10 @@ C  Find gamma by solving numerically Eq. 10.
 	entgasm = 0.
 C  Find Ag, Bg, and fg from moments.  For two moment solution (bfind2) use Eqs. 19,20,28 of Desjarlais (2013) PRE.  For four moment solution (bfind4) use Eqs. 19,20,30 of same.
 C  Having found fg, calculate W (Eqs. 7,8) and therefore the gas contribution to the entropy (Eq. 5).  For the ideal gas portion, assume that N_alpha/V_alpha = N/V, 
-C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  Note that the ideal mixing contribution is already included in the expression for the ideal gas entropy
-C  that we use (French et al., 2016, Eq. 8) and so the entropy of mixing term does not need to be added as in Lai et al. (2012) PCCP Eq. 13b.
+C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  
 	SIG = 0.
 	do 46 jtyp=1,ntyp
 	 Ba(jtyp) = fmom(2,jtyp)
-	 if (solid) go to 46
 	 g0 = gamma(jtyp)
 	 d0 = delta(jtyp)
 	 z0 = z(1,jtyp)
@@ -583,7 +593,7 @@ C  that we use (French et al., 2016, Eq. 8) and so the entropy of mixing term do
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0.) then
 	  call bfind2(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
-	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+	  Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
 	  entgas2 = entgas2 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
@@ -593,7 +603,7 @@ c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0. .and. fmom0(4) .gt. 0. .and. fmom0(5) .gt. 0.) then
 	  call bfind4(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 	  print '(a15,i5,99e12.5)', 'bfind4',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
-	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+	  Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
 	  entgas4 = entgas4 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
@@ -608,7 +618,6 @@ C  The following line skips this step and uses instead the moment matching resul
 c	go to 52
 	do 51 jtyp=1,ntyp
 	 Ba(jtyp) = fmom(2,jtyp)
-	 if (solid) go to 51
 	 g0 = gamma(jtyp)
 	 d0 = delta(jtyp)
 	 z0 = z(1,jtyp)
@@ -618,7 +627,7 @@ c	go to 52
 	 call bfindm(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
 	 xfrac = float(natyp(jtyp))/float(natom)
-	 Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natom*fgas(jtyp)) 
+	 Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &            + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &            + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
 	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
@@ -655,6 +664,7 @@ C  Compute gas VDOS Eq. 12 French et al. (2016)
          write(17,*) f*freqconversion,(fgas(jtyp)*zgas(i,jtyp)/4.,jtyp=1,ntyp)
 47	continue
 
+533	continue
 C  Compute solid entropy Eqs. 4,5,6
 	entsol = 0.
 	entsolpure = 0.
@@ -678,8 +688,11 @@ C  Compute solid entropy Eqs. 4,5,6
         write(12,'(a44,99f12.5)') 'Zeroth moment of solid VDOS (cm-1,K)',exp(theta0)*Wavenumbers,exp(theta0)*Wavenumbers*hcok
 
 	fgasmean = 0.
+	smix = 0.
 	do 61 jtyp=1,ntyp
 	 fgasmean = fgasmean + fgas(jtyp)/float(ntyp)
+         xfrac = float(natyp(jtyp))/float(natom)
+	 if (.not. solid) smix = smix - xfrac*log(xfrac)
 61	continue
 
 C  Compute total entropy
@@ -687,11 +700,11 @@ C  Compute total entropy
 	print '(a12,99a16)', 'Entropy (Nk)','gas2','gasm','solid','solid/(1-fgas)','fgasmean','solidpure'
      &   ,'Ideal Gas','-Excess','Total','Total(J/g/K)'
 	print '(12x,99f16.5)', entgas2,entgasm,entsol,entsol/(1.-fgasmean),fgasmean,entsolpure
-     &   ,SIG,SIG-ent,ent,ent/cellmass*Rgas*natom
+     &   ,SIG,SIG-ent,ent+smix,(ent+smix)/cellmass*Rgas*natom
 	write(12,'(a12,99a16)') 'Entropy (Nk)','gas2','gasm','solid','solid/(1-fgas)','fgasmean','solidpure'
      &   ,'Ideal Gas','-Excess','Total','Total(J/g/K)'
 	write(12,'(12x,99f16.5)') entgas2,entgasm,entsol,entsol/(1.-fgasmean),fgasmean,entsolpure
-     &   ,SIG,SIG-ent,ent,ent/cellmass*Rgas*natom
+     &   ,SIG,SIG-ent,ent+smix,(ent+smix)/cellmass*Rgas*natom
 
 	stop
 	end
