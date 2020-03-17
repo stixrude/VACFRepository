@@ -4,8 +4,8 @@
 	logical check
         real x(1)
         real fmom0(5)
-        common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,fmom0
-	ibtyp = 0
+        common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
+c	ibtyp = 0
 
 C  initial guess 
 

@@ -10,12 +10,12 @@
 	real sigvacf(nstepsp,ntypmxp),vacfint(nstepsp,ntypmxp),vacfmean(nstepsp,ntypmxp)
 	real vacfx(nstepsp,ntypmxp,3),zx(nstepsp,ntypmxp,3),dvacf(nstepsp,ntypmxp)
 	real vcm(3),sigx(ntypmxp),sigvx(ntypmxp),errav(nstepsp)
-	real delta(ntypmxp),gamma(ntypmxp),Aa(ntypmxp),Ba(ntypmxp),fgas(ntypmxp),Wa(ntypmxp)
+	real delta(ntypmxp),gamma(ntypmxp),Aa(ntypmxp),Ba(ntypmxp),fgas(ntypmxp),Wa(ntypmxp),fghs(ntypmxp)
 	real zgas(nstepsp,ntypmxp),zsol(nstepsp,ntypmxp),fmom(5,ntypmxp),fmom0(5),tarr(nstepsp),fmomx(5,ntypmxp)
 	real formz(natomsp),diff(ntypmxp),sdiff(ntypmxp),omega0(ntypmxp),omega1(ntypmxp),taumem(ntypmxp)
 	real vacfmem(ntypmxp),asec(ntypmxp),bsec(ntypmxp)
 	external zfunc,zzfunc
-	common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,fmom0
+	common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
 	common /zcom/ jtyp,kxyz,nintegrate,freq,dtime,tarr,vacf,vacfx
 	parameter (evk = 11605., elem=1.6021766208e-19)
 	parameter (femto=1.e-15)
@@ -123,6 +123,9 @@
 C  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
 	 vatyp(i) = volt(1)*natyp(i)/natom
 21	continue
+c	vatyp(1) = 1.8*volt(1)*natyp(1)/natom
+c	vatyp(2) = 1.4*volt(1)*natyp(2)/natom
+c	vatyp(3) = 0.6*volt(1)*natyp(3)/natom
         do 22 iatom=1,natom
          formz(iatom) = formzfunc(atom(ityp(iatom)))
 22      continue
@@ -239,6 +242,7 @@ C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarr
 	   end if
 133	  continue
 132	 continue
+	  write(98,*) istep,a(1,1)*vt(istep,1,1)
 131	continue
 1314	continue
 
@@ -539,9 +543,10 @@ C  Compute theoretical VACF of the form sech(at)cos(bt) after Isbister and McQua
 	 C = fmom(3,jtyp)/fmom(2,jtyp)**2
 	 asec(jtyp) = 0.5*sqrt((C - 1.)*fmom(2,jtyp))
 	 bsec(jtyp) = asec(jtyp)*sqrt((5. - C)/(C - 1.))
-c	 print*, C,asec(jtyp),bsec(jtyp),asec(jtyp)**2+bsec(jtyp)**2,fmom(2,jtyp)
+c	 print*, 'sech',C,asec(jtyp),bsec(jtyp),asec(jtyp)**2+bsec(jtyp)**2,fmom(2,jtyp),fmom(3,jtyp)
 c	 print*, 5.*asec(jtyp)**4 + 6.*asec(jtyp)**2*bsec(jtyp)**2 + bsec(jtyp)**4,fmom(3,jtyp)
-	 difsec = Rgas*temp/wmass(jtyp)*1.e3*pi/(2.*asec(jtyp))/cosh(pi*bsec(jtyp)/2.*asec(jtyp))*femto
+C  26 Jan. 2019.  Fixed error in following expression 1/(2*asec) in cosh argument, rather than erroneous 1/2*asec
+	 difsec = Rgas*temp/wmass(jtyp)*1.e3*pi/(2.*asec(jtyp))/cosh(pi*bsec(jtyp)/(2.*asec(jtyp)))*femto
 	 print '(a27,i5,e12.5)', 'sech diffusion coefficients',jtyp,difsec
 	 write(12,'(a27,i5,e12.5)') 'sech diffusion coefficients',jtyp,difsec
 44	continue
@@ -572,12 +577,21 @@ C  Find gamma by solving numerically Eq. 10.
 	print '(a15,99f12.5)', 'gamma:',(gamma(jtyp),jtyp=1,ntyp)
 	write(12,'(a15,99f12.5)') 'gamma:',(gamma(jtyp),jtyp=1,ntyp)
 
+C Calculate f_g^HS (Eq. 7 desjarlais_13)
+	do 451 jtyp=1,ntyp
+	 fghs(jtyp) = gamma(jtyp)**(2./5.)*delta(jtyp)**(3./5.)
+451	continue
+	print '(a15,99f12.5)', 'HS gas fractions:',(fghs(jtyp),jtyp=1,ntyp)
+	write(12,'(a15,99f12.5)') 'HS gas fractions:',(fghs(jtyp),jtyp=1,ntyp)
+
 	entgas2 = 0.
 	entgas4 = 0.
 	entgasm = 0.
 C  Find Ag, Bg, and fg from moments.  For two moment solution (bfind2) use Eqs. 19,20,28 of Desjarlais (2013) PRE.  For four moment solution (bfind4) use Eqs. 19,20,30 of same.
-C  Having found fg, calculate W (Eqs. 7,8) and therefore the gas contribution to the entropy (Eq. 5).  For the ideal gas portion, assume that N_alpha/V_alpha = N/V, 
-C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  
+C  Having found fg, calculate W (Eqs. 7,8) and therefore the gas contribution to the entropy (Eq. 5).  
+C  For the ideal gas portion, assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.  
+C  Feb. 12 2020.  Above statement is not correct.  SIG goes like -xfrac*log(debrog**3*n(jtyp)/V) where V is the total volume.  This is not an approximation.  This is an exact result for the ideal gas.
+C  With this exact result, smix is not an additional term and is no longer calculated since: -xfrac*log(n(jtyp)/V) = -xfrac*log(N/V*n(jtyp)/N) - -xfrac*log(N/V) - xfrac*log(xfrac)
 	SIG = 0.
 	do 46 jtyp=1,ntyp
 	 Ba(jtyp) = fmom(2,jtyp)
@@ -591,9 +605,11 @@ C  i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
 	 do 461 imom=1,5
 461	 fmom0(imom) = fmom(imom,jtyp)
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0.) then
+	  ibtyp = 2
 	  call bfind2(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	  Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+c	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
 	  entgas2 = entgas2 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
@@ -601,9 +617,11 @@ c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	   print*, 'Skipping 2 moment procedure'
 	 end if
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0. .and. fmom0(4) .gt. 0. .and. fmom0(5) .gt. 0.) then
+	  ibtyp = 4
 	  call bfind4(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 	  print '(a15,i5,99e12.5)', 'bfind4',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 	  Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+c	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
 	  entgas4 = entgas4 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
@@ -614,8 +632,39 @@ c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
 C  Find Ag, Bg, and fg so that the high frequency tail of the gas-like component matches the total density of states.  
 C  Do this by finding Bg such that f_gas*z_gas(f_match) = z(f_match) where f_match is given by: z(f_match) = z(0)/1000.
 C  This follows the argument in Desjarlais (2013) (page 5, pp beginning "Having demonstrated...")
+C  Modify procedure of desjarlais_13 as follows:
+c  1.  Assume that fg=fghs (desharlais eq. 7).  
+c  2.  Assume that Ag is given by z(0) (desjarlais_13 Eq. 18)
+C  The following line skips this step and uses instead the moment matching result to compute zgas.
+	go to 72
+	entgasm = 0.
+	do 71 jtyp=1,ntyp
+	 Ba(jtyp) = fmom(2,jtyp)
+	 g0 = gamma(jtyp)
+	 d0 = delta(jtyp)
+	 z0 = z(1,jtyp)
+	 f0 = fghs(jtyp)
+         zfind = z0/1000.
+         call hunt(z(1,jtyp),nfreq,zfind,jlo)
+	 ffind = df*float(jlo-1)
+	 ibtyp = 1
+	 call bfindm(Ba(jtyp),Aa(jtyp),fgas(jtyp))
+	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
+	 xfrac = float(natyp(jtyp))/float(natom)
+	 Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+c	 Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+     &            + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
+     &            + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
+	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
+	 print '(a15,i5,99e12.5)', 'bfindm modified',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp),Wa(jtyp),entgasm,gamma(jtyp)
+71	continue
+72	continue
+C  Find Ag, Bg, and fg so that the high frequency tail of the gas-like component matches the total density of states.  
+C  Do this by finding Bg such that f_gas*z_gas(f_match) = z(f_match) where f_match is given by: z(f_match) = z(0)/1000.
+C  This follows the argument in Desjarlais (2013) (page 5, pp beginning "Having demonstrated...")
 C  The following line skips this step and uses instead the moment matching result to compute zgas.
 c	go to 52
+	entgasm = 0.
 	do 51 jtyp=1,ntyp
 	 Ba(jtyp) = fmom(2,jtyp)
 	 g0 = gamma(jtyp)
@@ -624,10 +673,12 @@ c	go to 52
          zfind = z0/1000.
          call hunt(z(1,jtyp),nfreq,zfind,jlo)
 	 ffind = df*float(jlo-1)
+	 ibtyp = 0
 	 call bfindm(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
 	 xfrac = float(natyp(jtyp))/float(natom)
 	 Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+c	 Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &            + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &            + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
 	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
@@ -676,13 +727,16 @@ C  Compute solid entropy Eqs. 4,5,6
 	 Ws = 0.
 	 if (f .gt. 0.) Ws = 3.*(x/(exp(x) - 1.) - log(1. - exp(-x)))
 	 write(125,*) f*freqconversion,x,Ws,(Wa(jtyp),jtyp=1,ntyp)
+	 zsoltot = 0.
 	 do 50 jtyp=1,ntyp
 	  zsol(i,jtyp) = (z(i,jtyp) - fgas(jtyp)*zgas(i,jtyp))/(1. - fgas(jtyp))
+	  zsoltot = zsoltot + zsol(i,jtyp)*natyp(jtyp)/natom
 	  entsol = entsol + (1. - fgas(jtyp))*zsol(i,jtyp)*Ws*df*natyp(jtyp)/natom
 	  entsolpure = entsolpure + zsol(i,jtyp)*Ws*df*natyp(jtyp)/natom
           if (f .gt.  0.) theta0 = theta0 + zsol(i,jtyp)*log(f)*df*natyp(jtyp)/natom
           if (f .gt.  0.) tnorm0 = tnorm0 + zsol(i,jtyp)*df*natyp(jtyp)/natom
 50	 continue
+	 write(127,*) f*freqconversion,(zsol(i,jtyp),jtyp=1,ntyp),zsoltot
 49	continue
         print '(a44,99f12.5)', 'Zeroth moment of solid VDOS (cm-1,K)',exp(theta0)*Wavenumbers,exp(theta0)*Wavenumbers*hcok
         write(12,'(a44,99f12.5)') 'Zeroth moment of solid VDOS (cm-1,K)',exp(theta0)*Wavenumbers,exp(theta0)*Wavenumbers*hcok
@@ -694,17 +748,18 @@ C  Compute solid entropy Eqs. 4,5,6
          xfrac = float(natyp(jtyp))/float(natom)
 	 if (.not. solid) smix = smix - xfrac*log(xfrac)
 61	continue
+	print*, 'smix = ',smix
 
 C  Compute total entropy
 	ent = entgas + entsol
 	print '(a12,99a16)', 'Entropy (Nk)','gas2','gasm','solid','solid/(1-fgas)','fgasmean','solidpure'
      &   ,'Ideal Gas','-Excess','Total','Total(J/g/K)'
 	print '(12x,99f16.5)', entgas2,entgasm,entsol,entsol/(1.-fgasmean),fgasmean,entsolpure
-     &   ,SIG,SIG-ent,ent+smix,(ent+smix)/cellmass*Rgas*natom
+     &   ,SIG,SIG-ent-smix,ent+smix,(ent+smix)/cellmass*Rgas*natom
 	write(12,'(a12,99a16)') 'Entropy (Nk)','gas2','gasm','solid','solid/(1-fgas)','fgasmean','solidpure'
      &   ,'Ideal Gas','-Excess','Total','Total(J/g/K)'
 	write(12,'(12x,99f16.5)') entgas2,entgasm,entsol,entsol/(1.-fgasmean),fgasmean,entsolpure
-     &   ,SIG,SIG-ent,ent+smix,(ent+smix)/cellmass*Rgas*natom
+     &   ,SIG,SIG-ent-smix,ent+smix,(ent+smix)/cellmass*Rgas*natom
 
 	stop
 	end

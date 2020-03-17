@@ -4,8 +4,8 @@
 	logical check
 	real x(2)
         real fmom0(5)
-        common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,fmom0
-	ibtyp = 2
+        common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
+c	ibtyp = 2
 
 C  initial guess 
 

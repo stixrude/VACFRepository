@@ -1,10 +1,18 @@
 	subroutine funcv(n,x,fvec)
 	real x(n),fvec(n)
 	real fmom0(5)
-        common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,fmom0
+        common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
 	pi = 4.0*atan(1.0)
 
 	if (ibtyp .eq. 0) then
+	 Bg = x(1)
+	 call bcalc(Ag,Bg,fg)
+         zcalc = fg*zgasfunc(ffind,Ag,Bg)
+	 fvec(1) = zcalc - zfind
+c	 print*, 'in funcv',ibtyp,Ag,Bg,fg,fvec(1)
+	end if
+
+	if (ibtyp .eq. 1) then
 	 Bg = x(1)
 	 call bcalc(Ag,Bg,fg)
          zcalc = fg*zgasfunc(ffind,Ag,Bg)
