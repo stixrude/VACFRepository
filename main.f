@@ -13,7 +13,8 @@
 	real delta(ntypmxp),gamma(ntypmxp),Aa(ntypmxp),Ba(ntypmxp),fgas(ntypmxp),Wa(ntypmxp),fghs(ntypmxp)
 	real zgas(nstepsp,ntypmxp),zsol(nstepsp,ntypmxp),fmom(5,ntypmxp),fmom0(5),tarr(nstepsp),fmomx(5,ntypmxp)
 	real formz(natomsp),diff(ntypmxp),sdiff(ntypmxp),omega0(ntypmxp),omega1(ntypmxp),taumem(ntypmxp)
-	real vacfmem(ntypmxp),asec(ntypmxp),bsec(ntypmxp)
+	real vacfmem(ntypmxp),asec(ntypmxp),bsec(ntypmxp),fpa(ntypmxp),ppa(ntypmxp),fp(nstepsp,ntypmxp),pp(nstepsp,ntypmxp)
+	real fpmean(ntypmxp),ppmean(ntypmxp),sigfp(ntypmxp),sigpp(ntypmxp)
 	external zfunc,zzfunc
 	common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
 	common /zcom/ jtyp,kxyz,nintegrate,freq,dtime,tarr,vacf,vacfx
@@ -34,7 +35,7 @@
 	 print*, 'WARNING no VDATCAR file found.  Opening XDATCAR instead'
 	 open(3,file='XDATCAR',status='old')
 	end if
-	open(12,file='vacfout',status='unknown')
+	open(12,file='vacfout.txt',status='unknown')
 	open(121,file='vacf.txt',status='unknown')
 	open(13,file='vdos.txt',status='unknown')
 	open(17,file='vgas.txt',status='unknown')
@@ -123,9 +124,9 @@
 C  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
 	 vatyp(i) = volt(1)*natyp(i)/natom
 21	continue
-c	vatyp(1) = 1.8*volt(1)*natyp(1)/natom
-c	vatyp(2) = 1.4*volt(1)*natyp(2)/natom
-c	vatyp(3) = 0.6*volt(1)*natyp(3)/natom
+c	vatyp(1) = 1.399620942650126*volt(1)*natyp(1)/natom
+c	vatyp(2) = 1.054745867818514*volt(1)*natyp(2)/natom
+c	vatyp(3) = 0.848543501663074*volt(1)*natyp(3)/natom
         do 22 iatom=1,natom
          formz(iatom) = formzfunc(atom(ityp(iatom)))
 22      continue
@@ -148,6 +149,7 @@ c	vatyp(3) = 0.6*volt(1)*natyp(3)/natom
 151	continue
 1213    continue
 	print*, 'coordinates read in',nstep
+	write(12,*) 'coordinates read in',nstep
 	ibeg = nstep/ratio
 	nseg = nstep - ibeg
 c  By setting nintmax to a large number full range to maximimize spectral resolution.  Take care of increasing noise in vacf at large intervals with damping
@@ -163,10 +165,16 @@ C  WARNING: Assumes an orthogonal lattice
 	do 134 imom=1,5
 	 do 134 jtyp=1,ntyp
 	  fmomx(imom,jtyp) = 0.
+          fpa(jtyp) = 0.
+	  ppa(jtyp) = 0.
 134	continue
 	if (ios .eq. 0) then
 	 do 1311 istep=1,nstep
 	  time = float(istep-1)*potim
+          do 1365 jtyp=1,ntyp
+	   fp(istep,jtyp) = 0.
+	   pp(istep,jtyp) = 0.
+1365      continue 
 	  do 1312 iatom=1,natom
 	   do 1313 j=1,3
             call hunt(tarr,nstep,time,jlo)
@@ -203,6 +211,8 @@ C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarr
 	end if
 C  Compute velocities via polynomial interpolation of atomic positions
 C  WARNING: Assumes an orthogonal lattice
+	fpscale = 0.
+	ppscale = 0.
 	do 131 istep=1,nstep
 	 time = float(istep-1)*potim
 	 do 132 iatom=1,natom
@@ -239,12 +249,28 @@ C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarr
 	    fmomx(3,ityp(iatom)) = fmomx(3,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppi)**2
 	    fmomx(4,ityp(iatom)) = fmomx(4,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpppi)**2
 	    fmomx(5,ityp(iatom)) = fmomx(5,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppppi)**2
+	    ppa(ityp(iatom)) = ppa(ityp(iatom)) + wmass(ityp(iatom))**2*vti**2*a(j,j)**2
+	    fpa(ityp(iatom)) = fpa(ityp(iatom)) + wmass(ityp(iatom))**2*vti*vtpi*a(j,j)**2
+	    pp(istep,ityp(iatom)) = pp(istep,ityp(iatom)) + wmass(ityp(iatom))**2*vti**2*a(j,j)**2
+	    fp(istep,ityp(iatom)) = fp(istep,ityp(iatom)) + wmass(ityp(iatom))**2*vti*vtpi*a(j,j)**2
+	    ppscale = ppscale + wmass(ityp(iatom))**2*vti**2*a(j,j)**2
+	    fpscale = fpscale + wmass(ityp(iatom))**2*vti*vtpi*a(j,j)**2
 	   end if
 133	  continue
 132	 continue
 	  write(98,*) istep,a(1,1)*vt(istep,1,1)
 131	continue
 1314	continue
+	print*, 'xi ='
+	print '(3f16.5)', (fpa(jtyp),ppa(jtyp),fpa(jtyp)/ppa(jtyp)*1000.,jtyp=1,ntyp)
+	print*, fpscale,ppscale,fpscale/ppscale*1000.
+	do 1375 jtyp=1,ntyp
+         call flyv(fp(ibeg,jtyp),nseg+1,fpmean(jtyp),sigfp(jtyp),cor,1)
+         call flyv(pp(ibeg,jtyp),nseg+1,ppmean(jtyp),sigpp(jtyp),cor,1)
+1375	continue
+	print '(99f16.5)', (fpmean(jtyp),sigfp(jtyp),jtyp=1,ntyp)
+	print '(99f16.5)', (ppmean(jtyp),sigpp(jtyp),jtyp=1,ntyp)
+	print '(99f16.5)', (fpmean(jtyp)/ppmean(jtyp)*1000.,jtyp=1,ntyp)
 
 C  Compute Temperature
 
@@ -380,10 +406,10 @@ C  Uncertainty in VACF computed following ideas on pg. 197 of Allen and Tildesle
 C  consideration of fewer time origins for longer durations (t_run-t argument near bottom of page).
 C  Alternative estimates of uncertainty: variance in vacfx (sigvx), and flyv analysis (sigvacf).
          errav(int+1) = sqrt(2.*corav/float(natom)/float(nseg+1-int)/3.)*(1. - abs(vacfntyp))
-         write(121,'(99f21.16)') potim*float(int),(vacf(int+1,jtyp),jtyp=1,ntyp),errav(int+1)
-         write(126,'(99f21.16)') potim*float(int),(vacfmean(int+1,jtyp),jtyp=1,ntyp),(sigvacf(int+1,jtyp),jtyp=1,ntyp)
+         write(121,'(99f22.16)') potim*float(int),(vacf(int+1,jtyp),jtyp=1,ntyp),errav(int+1)
+         write(126,'(99f22.16)') potim*float(int),(vacfmean(int+1,jtyp),jtyp=1,ntyp),(sigvacf(int+1,jtyp),jtyp=1,ntyp)
      &                          ,(sigvx(jtyp),jtyp=1,ntyp)
-         write(15,'(99f21.16)') potim*float(int),(vacfx(int+1,1,k),k=1,3)
+         write(15,'(99f22.16)') potim*float(int),(vacfx(int+1,1,k),k=1,3)
 19      continue
 
 C  Cosine Transform
@@ -394,9 +420,13 @@ C  Print out frequency in wavenumbers
 C  Set up discrete Fourier transform integration dftint (Numerical Recipes, Section 13.9).  
 C  M=nintegrate, i.e. the number of time intervals.  
 C  N>M and must be a power of 2.  Recommendation is N>4M (comment immediately preceding Eq. 13.9.13 pg. 579.
-	ndft = log(float(nintegrate))/log(2.) + 3
+	ndft = log(float(nintegrate))/log(2.) + 2
 	ndft = 2**ndft
-	if (ndft .gt. nstepsp) ndft = ndft/2
+	if (ndft .gt. nstepsp) then
+	 ndft = log(float(nstepsp))/log(2.)
+	 ndft = 2**ndft
+	 print*, 'WARNING: behavior of discrete Fourier transform may not be optimal.  Try increasing nstepsp.'
+	end if
 	print*, 'nintegrate,ndft,nfreq = ',nintegrate,ndft,nfreq
 C  Gaussian damping defined so that damping=0.1 at t=dampfactor
 	damp = potim*dampfactor/sqrt(log(10.))
@@ -542,8 +572,26 @@ C  Use moments computed from trajectory
 C  Compute theoretical VACF of the form sech(at)cos(bt) after Isbister and McQuarrie (1972) J. Chem. Phys. 56, 736.
 	 C = fmom(3,jtyp)/fmom(2,jtyp)**2
 	 asec(jtyp) = 0.5*sqrt((C - 1.)*fmom(2,jtyp))
+c  alternative estimate of a from Isbister and McQuarrie Eq. 14
+	 if (C .le. 1.) asec(jtyp) = 1./z(1,jtyp)
+C  expression for b derived from Eq. 13 of Isbister and McQuarrie
 	 bsec(jtyp) = asec(jtyp)*sqrt((5. - C)/(C - 1.))
-c	 print*, 'sech',C,asec(jtyp),bsec(jtyp),asec(jtyp)**2+bsec(jtyp)**2,fmom(2,jtyp),fmom(3,jtyp)
+C  equivalent expression for b from the coefficient of the t^2 term in the MacLaurin series of Eq. 2, which is -(a^2+b^2)/2
+	 bsec(jtyp) = sqrt(fmom(2,jtyp) - asec(jtyp)**2)
+C  alternative expression for b derived from Isbister and McQuarrie Eq. 13 by setting D = diff(jtyp) and solving for b (given a).
+	 if (asec(jtyp)**2 .gt. fmom(2,jtyp)) then
+	  if (pi/(z(1,jtyp)*2.*asec(jtyp)) .lt. 1.) then
+c  no solution to sech b coefficient
+	   bsec(jtyp) = 0.
+c  match the second moment
+	   asec(jtyp) = sqrt(fmom(2,jtyp))
+c  match the diffusion coefficient
+c	   asec(jtyp) = pi/2./z(1,jtyp)
+	  else
+	   bsec(jtyp) = 2.*asec(jtyp)/pi*acosh(pi/(z(1,jtyp)*2.*asec(jtyp)))
+	  end if
+	 end if
+c	 print*, 'sech',C,asec(jtyp),bsec(jtyp),fmom(2,jtyp),fmom(3,jtyp)
 c	 print*, 5.*asec(jtyp)**4 + 6.*asec(jtyp)**2*bsec(jtyp)**2 + bsec(jtyp)**4,fmom(3,jtyp)
 C  26 Jan. 2019.  Fixed error in following expression 1/(2*asec) in cosh argument, rather than erroneous 1/2*asec
 	 difsec = Rgas*temp/wmass(jtyp)*1.e3*pi/(2.*asec(jtyp))/cosh(pi*bsec(jtyp)/(2.*asec(jtyp)))*femto
@@ -671,8 +719,10 @@ c	go to 52
 	 d0 = delta(jtyp)
 	 z0 = z(1,jtyp)
          zfind = z0/1000.
+	 zfind = 0.001
          call hunt(z(1,jtyp),nfreq,zfind,jlo)
 	 ffind = df*float(jlo-1)
+	print*, 'Match at this frequency (cm-1)',ffind/(femto*cspeed)
 	 ibtyp = 0
 	 call bfindm(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))

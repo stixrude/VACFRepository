@@ -28,6 +28,7 @@ zgasfunc.o bcalc.o bfindm.o polcof.o formzfunc.o gasdev.o
 # LIB1 = -framework Accelerate
 # LIB3 = /Users/stixrude/WORK/SCILIBS/MINPACK/minpack_dp.a
 # LIB4 = /Users/stixrude/WORK/SCILIBS/slatec4gf41c/libslatec.a
+LIB2 = -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 
 $(COMMAND): $(MAIN) $(SUBS)
 	$(LDR) $(FFLAGS) -o $(COMMAND) $(MAIN) $(SUBS) $(LIB1) $(LIB2) $(LIB3) $(LIB4)

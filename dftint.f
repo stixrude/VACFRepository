@@ -15,7 +15,7 @@ CU    USES dftcor,func,polint,realft
       INTEGER init,j,nn
       REAL aold,bold,c,cdft,cerr,corfac,corim,corre,delta,en,s,sdft,
 c     *serr,cpol(MPOL),data(NDFT),endpts(8),spol(MPOL),xpol(MPOL)
-     *serr,cpol(MPOL),data(nstepsp),endpts(8),spol(MPOL),xpol(MPOL)
+     *serr,cpol(MPOL),data(4*nstepsp),endpts(8),spol(MPOL),xpol(MPOL)
 c      SAVE init,aold,bold,delta,data,endpts
 c      DATA init/0/,aold/-1.e30/,bold/-1.e30/
       SAVE aold,bold,delta,data,endpts

@@ -1,0 +1,42 @@
+ header = CaSiO3                                                                          
+ Computational parameters
+ solid = F  potim =   1.0000000000000000       ratio =   2.0000000000000000       nintmax =        31000  mint =           4  dampfactor =   500.00000000000000     
+ volume =    1268.1287562240000     
+ atom types  CaSiO 
+ atom masses    40.078000000000003        28.085500000000000        15.999400000000000     
+ atom numbers          27          27          81
+ Density =    4.1068838163120924       g/cm^3
+ Number Density =   0.10645606712837119       atoms/A^3
+ coordinates read in        6000
+    Average Temperature (K)  4017.01680
+ Einstein frequencies (THz)    10.12343    18.22703    18.35117
+Einstein frequencies (cm-1)   337.68141   607.98821   612.12912
+ Moments from trajectories
+       2nd moms(cm-1)   337.68141   607.98821   612.12912
+       Fourth moments   444.74947   777.46170   752.51499
+        Sixth moments     0.00000     0.00000     0.00000
+       Eighth moments     0.00000     0.00000     0.00000
+  
+ Self-diffusion coefficient (m^2/s)
+   Ca 0.34787E-08 +- 0.52421E-09
+   Si 0.31493E-08 +- 0.40519E-09
+   O  0.48255E-08 +- 0.25602E-09
+Nernst-Einstein Conductivity (Sm/m) 0.83192E+03
+ Moments from Fourier transform of VACF
+       2nd moms(cm-1)   337.85960   615.71930   618.54634
+       Fourth moments   444.16915   886.06314   857.73114
+        Sixth moments   570.03908  1849.45547  1811.80157
+       Eighth moments   704.17221  3050.31907  3004.96739
+sech diffusion coefficients    1 0.11649E-07
+sech diffusion coefficients    2 0.77252E-08
+sech diffusion coefficients    3 0.10116E-07
+         Delta:     0.13086     0.10087     0.11627
+         gamma:     0.45017     0.47707     0.46251
+HS gas fraction     0.21450     0.18780     0.20199
+sqrt(Ag) (cm-1)   345.28414   551.37396   558.59691
+sqrt(Bg) (cm-1)   514.88985   907.46517   816.30952
+ gas fractions:     0.16068     0.15002     0.14891
+             Wa    14.26743    13.43893    12.80715
+        Zeroth moment of solid VDOS (cm-1,K)   424.60819   610.91570
+Entropy (Nk)            gas2            gasm           solid  solid/(1-fgas)        fgasmean       solidpure       Ideal Gas         -Excess           Total    Total(J/g/K)
+                     2.14214         2.00600         7.34070         8.66881         0.15320         8.65534        14.16143         3.86445        10.29698         3.68512
