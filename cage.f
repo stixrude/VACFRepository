@@ -18,7 +18,6 @@ c	integer ires
 	iter = 0
 	fa = func(a)
 	fb = func(b)
-c	write(*,*) a,b,fa,fb
 	do 1 i=1,itmax
 	 if (fa*fb .lt. 0.) return
 	 if (abs(fa) .lt. abs(fb)) then
@@ -38,7 +37,6 @@ c	write(*,*) a,b,fa,fb
 	  b = bt
 	  fb = func(b)
 	 end if
-c	 write(31,*) i,a,b,fa,fb
 1	continue
 	ires = 0
 

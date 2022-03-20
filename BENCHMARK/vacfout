@@ -37,6 +37,6 @@ sqrt(Ag) (cm-1)   345.28414   551.37396   558.59691
 sqrt(Bg) (cm-1)   514.88985   907.46517   816.30952
  gas fractions:     0.16068     0.15002     0.14891
              Wa    14.26743    13.43893    12.80715
-        Zeroth moment of solid VDOS (cm-1,K)   424.60819   610.91570
+        Zeroth moment of solid VDOS (cm-1,K)   424.60818   610.91569
 Entropy (Nk)            gas2            gasm           solid  solid/(1-fgas)        fgasmean       solidpure       Ideal Gas         -Excess           Total    Total(J/g/K)
                      2.14214         2.00600         7.34070         8.66881         0.15320         8.65534        14.16143         3.86445        10.29698         3.68512

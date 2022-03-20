@@ -35,7 +35,7 @@
 	 print*, 'WARNING no VDATCAR file found.  Opening XDATCAR instead'
 	 open(3,file='XDATCAR',status='old')
 	end if
-	open(12,file='vacfout.txt',status='unknown')
+	open(12,file='vacfout',status='unknown')
 	open(121,file='vacf.txt',status='unknown')
 	open(13,file='vdos.txt',status='unknown')
 	open(17,file='vgas.txt',status='unknown')
@@ -258,7 +258,6 @@ C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarr
 	   end if
 133	  continue
 132	 continue
-	  write(98,*) istep,a(1,1)*vt(istep,1,1)
 131	continue
 1314	continue
 	print*, 'xi ='
@@ -420,7 +419,7 @@ C  Print out frequency in wavenumbers
 C  Set up discrete Fourier transform integration dftint (Numerical Recipes, Section 13.9).  
 C  M=nintegrate, i.e. the number of time intervals.  
 C  N>M and must be a power of 2.  Recommendation is N>4M (comment immediately preceding Eq. 13.9.13 pg. 579.
-	ndft = log(float(nintegrate))/log(2.) + 2
+	ndft = log(float(nintegrate))/log(2.) + 3
 	ndft = 2**ndft
 	if (ndft .gt. nstepsp) then
 	 ndft = log(float(nstepsp))/log(2.)
@@ -507,8 +506,8 @@ C  Compute parameters appearing in the exponential memory function theory of VAC
 	   vacfmem(jtyp) = 1./(ap - am)*(ap*exp(-am*time) - am*exp(-ap*time))
 	  end if
 34	 continue
-         write(1121,'(99f21.16)') time,(vacfmem(jtyp),jtyp=1,ntyp),ap,am,discr
-         write(1122,'(99f21.16)') time,(exp(-omega0(jtyp)**2*time**2/2.),jtyp=1,ntyp)
+         write(151,'(99f21.16)') time,(vacfmem(jtyp),jtyp=1,ntyp),ap,am,discr
+         write(161,'(99f21.16)') time,(exp(-omega0(jtyp)**2*time**2/2.),jtyp=1,ntyp)
 33	continue
 
         condne = 0.
@@ -526,7 +525,7 @@ C  Normalize z_jtyp.  Eq. (1).
 	  z(i,jtyp) = 4.*z(i,jtyp)
 42	 continue
          f = df*float(i-1)
-	 write(16,*) f*freqconversion,(z(i,jtyp)/4.,jtyp=1,ntyp)
+c	 write(16,*) f*freqconversion,(z(i,jtyp)/4.,jtyp=1,ntyp)
 41	continue
 
 C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text following Eq. 21 in Desjarlais (2013): M_2n = <omega^(2n)>.
@@ -542,7 +541,7 @@ C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text 
 	  do 432 imom=1,5
 	   fmom(imom,jtyp) = fmom(imom,jtyp) + zfac*fac*z(i,jtyp)*(2.*pi*f)**(2.*(imom-1))*df
 432	  continue
-	  write(123,*) f*freqconversion,(fmom(imom,1),imom=1,5)
+c	  write(123,*) f*freqconversion,(fmom(imom,1),imom=1,5)
 43	continue
 	print*, 'Sum rule check',(fmom(1,jtyp),jtyp=1,ntyp),((fmom(m,jtyp),m=1,5),jtyp=1,ntyp)
 	print*, 'Moments from Fourier transform of VACF'
@@ -810,6 +809,9 @@ C  Compute total entropy
      &   ,'Ideal Gas','-Excess','Total','Total(J/g/K)'
 	write(12,'(12x,99f16.5)') entgas2,entgasm,entsol,entsol/(1.-fgasmean),fgasmean,entsolpure
      &   ,SIG,SIG-ent-smix,ent+smix,(ent+smix)/cellmass*Rgas*natom
+
+	flush (12)
+	close (12)
 
 	stop
 	end

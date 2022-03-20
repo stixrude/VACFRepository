@@ -42,7 +42,6 @@ c	print*, 'Number of re-binnings = ',nrbin,xm,n
 	dc = faci*ci
 	irb = 0
 	np = n
-c	if (n .lt. 6) write(11,*) 'in flyv',n,xm,x2m,ci,dc,(x(i),i=1,n)
 
 	cmax = -1.
 	cold = 0.
@@ -77,7 +76,6 @@ c	  print 100, irb,np,c,sqrt(c),dc
 	sig = sqrt(cmax)
 	dsig = dc
 c	print 200, sqrt(cmax),dcmax
-c	if (n .lt. 6) write(11,*) 'in flyv',cmax,sig
 
 	cor = float(n)*sig**2/(ci*float(n-1))
 
