@@ -4,7 +4,7 @@
 	character*80 subs(100)
 	character*2 atom(ntypmxp)
 	integer natyp(ntypmxp),ityp(natomsp),nchar(100)
-	real a(3,3),at(3,3,nstepsp),volt(nstepsp)
+	real a(3,3),at(nstepsp,3,3),volt(nstepsp)
 	real xt(nstepsp,natomsp,3),wmass(ntypmxp),vatyp(ntypmxp)
 	real vt(nstepsp,natomsp,3),vacf(nstepsp,ntypmxp),vacf0(ntypmxp),vacfx0(ntypmxp,3),z(nstepsp,ntypmxp)
 	real sigvacf(nstepsp,ntypmxp),vacfint(nstepsp,ntypmxp),vacfmean(nstepsp,ntypmxp)
@@ -14,7 +14,7 @@
 	real zgas(nstepsp,ntypmxp),zsol(nstepsp,ntypmxp),fmom(5,ntypmxp),fmom0(5),tarr(nstepsp),fmomx(5,ntypmxp)
 	real formz(natomsp),diff(ntypmxp),sdiff(ntypmxp),omega0(ntypmxp),omega1(ntypmxp),taumem(ntypmxp)
 	real vacfmem(ntypmxp),asec(ntypmxp),bsec(ntypmxp),fpa(ntypmxp),ppa(ntypmxp),fp(nstepsp,ntypmxp),pp(nstepsp,ntypmxp)
-	real fpmean(ntypmxp),ppmean(ntypmxp),sigfp(ntypmxp),sigpp(ntypmxp)
+	real fpmean(ntypmxp),ppmean(ntypmxp),sigfp(ntypmxp),sigpp(ntypmxp),vtmp(3,natomsp)
 	external zfunc,zzfunc
 	common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
 	common /zcom/ jtyp,kxyz,nintegrate,freq,dtime,tarr,vacf,vacfx
@@ -23,133 +23,38 @@
 	parameter (gammax=0.545, iseed=5)
         parameter (Wavenumbers=1./femto/cspeed)
         parameter (THz=1./femto*1.e-12)
-	real cof(mint),xut(mint),xold
+	real cof(mint),xut(mint),xold,xu(3,mint),xc(3,mint),xctemp(3),xutemp(3)
 	pi = 4.0*atan(1.0)
 	dtime = potim
 	freqconversion = Wavenumbers
 	if (LTHz) freqconversion = THz
 	print*, 'frequency conversion = ',freqconversion
 
-	open(3,file='VDATCAR',status='old',iostat=ios)
-	if (ios .ne. 0) then
-	 print*, 'WARNING no VDATCAR file found.  Opening XDATCAR instead'
-	 open(3,file='XDATCAR',status='old')
-	end if
 	open(12,file='vacfout',status='unknown')
 	open(121,file='vacf.txt',status='unknown')
 	open(13,file='vdos.txt',status='unknown')
 	open(17,file='vgas.txt',status='unknown')
 	open(122,file='damp.txt',status='unknown')
 
-	read(3,*) header
-	print*, 'header = ',header
-	write(12,*) 'header = ',header
 	print*, 'Computational parameters'
 	print*, 'solid =',solid,' potim =',potim,' ratio =',ratio,' nintmax = ',nintmax,' mint =',mint,' dampfactor =',dampfactor
 	write(12,*) 'Computational parameters'
 	write(12,*) 'solid =',solid,' potim =',potim,' ratio =',ratio,' nintmax = ',nintmax,' mint =',mint,' dampfactor =',dampfactor
-	read(3,*) scale
-        read(3,*) (at(i,1,1),i=1,3)
-        read(3,*) (at(i,2,1),i=1,3)
-        read(3,*) (at(i,3,1),i=1,3)
-	do 1411 i=1,3
-	 do 1411 j=1,3
-	  at(i,j,1) = scale*at(i,j,1)
-1411	continue
-        do 141 i=1,3
-         do 141 j=1,3
-          a(i,j) = at(i,j,1)
-141     continue
-        volt(1) = vcell(at(1,1,1))
-        print*, 'volume = ',volt(1)
-        write(12,*) 'volume = ',volt(1)
-	vol = volt(1)
-	volm = vol
-	apaco = (vol)**(1./3.)
-	read(3,'(a80)') lab
-	call parse(lab,subs,nchar,n,80)
-	do 142 iatom=1,n
-	 atom(iatom) = subs(iatom)
-	 do 1421 iel=1,nelem
-	  if (atom(iatom) .eq. elnam(iel)) then
-	   wmass(iatom) = wat(iel)
-	  end if
-1421	 continue
-142	continue
-	print*, 'atom types  ',(atom(iatom),iatom=1,n)
-	write(12,*) 'atom types  ',(atom(iatom),iatom=1,n)
-	print*, 'atom masses ',(wmass(iatom),iatom=1,n)
-	write(12,*) 'atom masses ',(wmass(iatom),iatom=1,n)
-        do 112 ntyp=1,ntypmxp
-         read(3,*,err=113) (natyp(j),j=1,ntyp)
-         backspace 3
-112     continue
-113     continue
-	backspace 3
-        ntyp = ntyp - 1
-        print*, ntyp,(natyp(j),j=1,ntyp)
-        write(12,*) 'atom numbers',(natyp(j),j=1,ntyp)
-        wtot = 0.
-        do 1422 i=1,ntyp
-         wtot = wtot + natyp(i)*wmass(i)
-1422    continue
-        density = wtot/volt(1)/avn*1.e24
-        print*, 'Density = ',density,' g/cm^3'
-        write(12,*) 'Density = ',density,' g/cm^3'
-	if (n .ne. ntyp) print*, 'inconsistency in atom labels and atom numbers',n,ntyp
-	natom = 0
-	natpmn = 100000
-        do 13 i=1,ntyp
-         natom = natom + natyp(i)
-	 natpmn = min(natyp(i),natpmn)
-13      continue
-        densitynum = float(natom)/volt(1)
-        print*, 'Number Density = ',densitynum,' atoms/A^3'
-        write(12,*) 'Number Density = ',densitynum,' atoms/A^3'
-        iityp = 1
-        nasum = natyp(iityp)
-        do 14 i=1,natom
-         if (i .le. nasum) then
-          ityp(i) = iityp
-         else
-          iityp = iityp + 1
-          nasum = nasum + natyp(iityp)
-          ityp(i) = iityp
-         end if
-14      continue
-	print*, 'total number of atoms = ',natom
-	cellmass = 0.
-	do 21 i=1,ntyp
-	 cellmass = cellmass + natyp(i)*wmass(i)
+	call readxdatcar(natom,ntyp,nstep,atom,wmass,cellmass,density,densitynum,vol,natyp,ityp,at,tarr,xt)
+	do 921 i=1,3
+	 do 921 j=1,3
+	  a(i,j) = at(1,i,j)
+921	continue
+
 C  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
-	 vatyp(i) = volt(1)*natyp(i)/natom
+	do 21 i=1,ntyp
+	 vatyp(i) = vol*natyp(i)/natom
 21	continue
-c	vatyp(1) = 1.399620942650126*volt(1)*natyp(1)/natom
-c	vatyp(2) = 1.054745867818514*volt(1)*natyp(2)/natom
-c	vatyp(3) = 0.848543501663074*volt(1)*natyp(3)/natom
+C  Assign valence to atoms for Nernst-Einstein conductivity calculation.
         do 22 iatom=1,natom
          formz(iatom) = formzfunc(atom(ityp(iatom)))
 22      continue
-	print*, 'Cell mass = ',cellmass
-	nstep = 0
-	do 151 istep=1,nstepsp
-	 read(3,*,end=1213) lab
-	 if (lab .eq. header) then
-	  print*, istep,lab
-	  call skip(3,7,ierr)
-	 end if
-	 do 121 i=1,natom
-	  read(3,*,err=1211,end=1213) (xt(istep,i,j),j=1,3)
-	  go to 1212
-1211	  print*, 'Error reading from XDATSUM',istep,i,(xt(istep,i,j),j=1,3),(xt(istep,i-1,j),j=1,3)
-1212	  continue
-121	 continue
-	 nstep = nstep + 1
-	 tarr(istep) = potim*(istep-1)
-151	continue
-1213    continue
-	print*, 'coordinates read in',nstep
-	write(12,*) 'coordinates read in',nstep
+
 	ibeg = nstep/ratio
 	nseg = nstep - ibeg
 c  By setting nintmax to a large number full range to maximimize spectral resolution.  Take care of increasing noise in vacf at large intervals with damping
@@ -160,72 +65,40 @@ C  Analyze nintegrate in terms of the periodic propagation of sound waves (cf. H
 	print*, 'Sound speed must be smaller than this value to avoid periodic sound waves = ',sound,' km/s'
 	print*, 'Adiabatic bulk modulus must be smaller than this value to avoid periodic sound waves = ',bulksound,' GPa'
 
-C  Compute velocities directly from VDATCAR in which velocities are given in lattice coordinate/time step
-C  WARNING: Assumes an orthogonal lattice
-	do 134 imom=1,5
-	 do 134 jtyp=1,ntyp
-	  fmomx(imom,jtyp) = 0.
-          fpa(jtyp) = 0.
-	  ppa(jtyp) = 0.
-134	continue
-	if (ios .eq. 0) then
-	 do 1311 istep=1,nstep
-	  time = float(istep-1)*potim
-          do 1365 jtyp=1,ntyp
-	   fp(istep,jtyp) = 0.
-	   pp(istep,jtyp) = 0.
-1365      continue 
-	  do 1312 iatom=1,natom
-	   do 1313 j=1,3
-            call hunt(tarr,nstep,time,jlo)
-            klo = min(max(jlo-(mint-1)/2,1),nstep+1-mint)
-	    do 184 mstep=1,mint
-	     xut(mstep) = xt(klo+mstep-1,iatom,j)
-184	    continue
-C  Find coefficients of the interpolating polynomial
-            call polcof(tarr(klo),xut(1),mint,cof)
-	    vti = 0.
-	    vtpi = 0.
-	    vtppi = 0.
-	    vtpppi = 0.
-	    vtppppi = 0.
-C  Compute time derivatives
-	    do 183 k=2,mint
-	     vti = vti + (k-1)*cof(k)*time**(k-2)
-	     if (k .gt. 2) vtpi = vtpi + (k-1)*(k-2)*cof(k)*time**(k-3)
-	     if (k .gt. 3) vtppi = vtppi + (k-1)*(k-2)*(k-3)*cof(k)*time**(k-4)
-	     if (k .gt. 4) vtpppi = vtpppi + (k-1)*(k-2)*(k-3)*(k-4)*cof(k)*time**(k-5)
-183	    continue
-	    vt(istep,iatom,j) = a(j,j)*xt(istep,iatom,j)/potim
-C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarrie (1972) J. Chem. Phys., 56, 736, Eq. 4 and Desjarlais (2013) Eq. 21.
-	    if (istep .ge. ibeg) then
-	     fmomx(2,ityp(iatom)) = fmomx(2,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vti/potim)**2
-	     fmomx(3,ityp(iatom)) = fmomx(3,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpi/potim)**2
-	     fmomx(4,ityp(iatom)) = fmomx(4,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppi/potim)**2
-	     fmomx(5,ityp(iatom)) = fmomx(5,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpppi/potim)**2
-	    end if
-1313	   continue
-1312	  continue
-1311	 continue
-	 go to 1314
-	end if
 C  Compute velocities via polynomial interpolation of atomic positions
-C  WARNING: Assumes an orthogonal lattice
+C  The following allows for general variations in cell shape and size, e.g. from an NPT molecular dynamics simulation
 	fpscale = 0.
 	ppscale = 0.
 	do 131 istep=1,nstep
 	 time = float(istep-1)*potim
+         call hunt(tarr,nstep,time,jlo)
+         klo = min(max(jlo-(mint-1)/2,1),nstep+1-mint)
 	 do 132 iatom=1,natom
-	  do 133 j=1,3
-           call hunt(tarr,nstep,time,jlo)
-           klo = min(max(jlo-(mint-1)/2,1),nstep+1-mint)
+C  Unwrap the portion of the time series needed for polynomial interpolation
+	  do 134 j=1,3
 	   xold = xt(klo,iatom,j)
 	   lx = 0
-C  Unwrap the portion of the time series needed for polynomial interpolation
-	   do 182 mstep=1,mint
+	   do 183 mstep=1,mint
 	    lx = lx - nint(xt(klo+mstep-1,iatom,j) - xold)
 	    xold = xt(klo+mstep-1,iatom,j)
-	    xut(mstep) = xt(klo+mstep-1,iatom,j) + lx
+cxc	    xut(mstep) = xt(klo+mstep-1,iatom,j) + lx
+	    xu(j,mstep) = xt(klo+mstep-1,iatom,j) + lx
+183	   continue
+134	  continue
+	  do 184 mstep=1,mint
+	   do 135 j=1,3
+	    xutemp(j) = xu(j,mstep)
+135	   continue
+c	   xctemp = matmul(at(istep,:,:),xutemp)
+	   xctemp = matmul(at(klo,:,:),xutemp)
+	   do 176 j=1,3
+	    xc(j,mstep) = xctemp(j)
+176	   continue
+184	  continue
+	  do 133 j=1,3
+	   do 182 mstep=1,mint
+cxc	    xut(mstep) = xu(j,mstep)
+	    xut(mstep) = xc(j,mstep)
 182	   continue
 C  Find coefficients of the interpolating polynomial
            call polcof(tarr(klo),xut(1),mint,cof)
@@ -242,13 +115,18 @@ C  Compute time derivatives
 	    if (k .gt. 4) vtpppi = vtpppi + (k-1)*(k-2)*(k-3)*(k-4)*cof(k)*time**(k-5)
 	    if (k .gt. 5) vtppppi = vtppppi + (k-1)*(k-2)*(k-3)*(k-4)*(k-5)*cof(k)*time**(k-6)
 181	   continue
-	   vt(istep,iatom,j) = a(j,j)*vti
+cxc	   vt(istep,iatom,j) = a(j,j)*vti
+	   vt(istep,iatom,j) = vti
 C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarrie (1972) J. Chem. Phys., 56, 736, Eq. 4 and Desjarlais (2013) Eq. 21.
 	   if (istep .ge. ibeg) then
-	    fmomx(2,ityp(iatom)) = fmomx(2,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpi)**2
-	    fmomx(3,ityp(iatom)) = fmomx(3,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppi)**2
-	    fmomx(4,ityp(iatom)) = fmomx(4,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpppi)**2
-	    fmomx(5,ityp(iatom)) = fmomx(5,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppppi)**2
+cxc	    fmomx(2,ityp(iatom)) = fmomx(2,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpi)**2
+cxc	    fmomx(3,ityp(iatom)) = fmomx(3,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppi)**2
+cxc	    fmomx(4,ityp(iatom)) = fmomx(4,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpppi)**2
+cxc	    fmomx(5,ityp(iatom)) = fmomx(5,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppppi)**2
+	    fmomx(2,ityp(iatom)) = fmomx(2,ityp(iatom)) + wmass(ityp(iatom))*(vtpi)**2
+	    fmomx(3,ityp(iatom)) = fmomx(3,ityp(iatom)) + wmass(ityp(iatom))*(vtppi)**2
+	    fmomx(4,ityp(iatom)) = fmomx(4,ityp(iatom)) + wmass(ityp(iatom))*(vtpppi)**2
+	    fmomx(5,ityp(iatom)) = fmomx(5,ityp(iatom)) + wmass(ityp(iatom))*(vtppppi)**2
 	    ppa(ityp(iatom)) = ppa(ityp(iatom)) + wmass(ityp(iatom))**2*vti**2*a(j,j)**2
 	    fpa(ityp(iatom)) = fpa(ityp(iatom)) + wmass(ityp(iatom))**2*vti*vtpi*a(j,j)**2
 	    pp(istep,ityp(iatom)) = pp(istep,ityp(iatom)) + wmass(ityp(iatom))**2*vti**2*a(j,j)**2

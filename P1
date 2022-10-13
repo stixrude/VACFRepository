@@ -1,5 +1,5 @@
 C The ratio of the total number of time steps to the transient number of time steps
-        parameter (ratio = 2.0)
+        parameter (ratio = 5.0)
 C Maximum number of atom types, time steps, atoms, equilibrium time steps
 	parameter (ntypmxp=10, nstepsp=31000, natomsp=1200, nstepavp=nstepsp*(1.-1./ratio))
 C Needed by const.inc for unit matrix dimensions etc.
