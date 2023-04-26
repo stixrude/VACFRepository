@@ -106,11 +106,13 @@ ctest          read(1,*) (acellalt(istep,i,3),i=1,3)
             acell(istep,i,j) = scale*acell(istep,i,j)
 ctest           acellalt(istep,i,j) = scale*acellalt(istep,i,j)
 141       continue
-          print*, istep,lab,acell(istep,:,:)
+c          print*, istep,lab,acell(istep,:,:)
           call skip(1,3,ierr)
          end if
          do 121 i=1,natom
           read(1,*,err=1211,end=1213) (xt(istep,i,j),j=1,3)
+	  do 122 j=1,3
+122	  xt(istep,i,j) = xt(istep,i,j) - floor(xt(istep,i,j))
           go to 1212
 1211      print*, 'Error reading from XDATCAR',istep,i,(xt(istep,i,j),j=1,3),(xt(istep,i-1,j),j=1,3)
 1212      continue
@@ -121,6 +123,8 @@ ctest           acellalt(istep,i,j) = scale*acellalt(istep,i,j)
 1213    continue
         print*, 'coordinates read in',nstep
         write(12,*) 'coordinates read in',nstep
+	do 123 i=1,natom
+123	write(129,*) (xt(nstep,i,j),j=1,3)
 
 	return
 	end

@@ -76,21 +76,20 @@ C  The following allows for general variations in cell shape and size, e.g. from
 	 do 132 iatom=1,natom
 C  Unwrap the portion of the time series needed for polynomial interpolation
 	  do 134 j=1,3
-	   xold = xt(klo,iatom,j)
-	   lx = 0
-	   do 183 mstep=1,mint
-	    lx = lx - nint(xt(klo+mstep-1,iatom,j) - xold)
-	    xold = xt(klo+mstep-1,iatom,j)
+	   xu(j,1) = xt(klo,iatom,j)
+	   do 183 mstep=2,mint
 cxc	    xut(mstep) = xt(klo+mstep-1,iatom,j) + lx
-	    xu(j,mstep) = xt(klo+mstep-1,iatom,j) + lx
+c	    xu(j,mstep) = xt(klo+mstep-1,iatom,j) - nint(xt(klo+mstep-1,iatom,j) - xu(j,mstep-1))	! vonbulowetal_20 Eq. 3
+	    xu(j,mstep) = xu(j,mstep-1) + xt(klo+mstep-1,iatom,j) - xt(klo+mstep-2,iatom,j) 
+     &                  - nint(xt(klo+mstep-1,iatom,j) - xt(klo+mstep-2,iatom,j))					! vonbulowetal_20 Eq. 1
 183	   continue
 134	  continue
 	  do 184 mstep=1,mint
 	   do 135 j=1,3
 	    xutemp(j) = xu(j,mstep)
 135	   continue
-c	   xctemp = matmul(at(istep,:,:),xutemp)
-	   xctemp = matmul(at(klo,:,:),xutemp)
+	   xctemp = matmul(at(istep,:,:),xutemp)
+c	   xctemp = matmul(at(klo,:,:),xutemp)
 	   do 176 j=1,3
 	    xc(j,mstep) = xctemp(j)
 176	   continue
@@ -149,6 +148,10 @@ cxc	    fmomx(5,ityp(iatom)) = fmomx(5,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)
 	print '(99f16.5)', (ppmean(jtyp),sigpp(jtyp),jtyp=1,ntyp)
 	print '(99f16.5)', (fpmean(jtyp)/ppmean(jtyp)*1000.,jtyp=1,ntyp)
 
+	do 1376 iatom=1,natom
+	 write(128,*) (vt(nstep,iatom,j),j=1,3)
+1376	continue
+
 C  Compute Temperature
 
 	avke = 0.
@@ -191,11 +194,22 @@ C  Compute Temperature
 	 fmomx(5,ia) = fmomx(5,ia)*1.e7/(3.*Rgas*temp)/float(nseg+1)/float(natyp(ia))
 	 omega0(ia) = sqrt(fmomx(2,ia))
 144	continue
+
+C  18/04/23.  Subtract the center of mass velocity.  This is nominally done in vasp, but I have found that the center of mass velocity can be significant in NPT simulations.
+C  Test was using enliqml/train1 comparing NVT and NPH simulations at 10 GPa, 6000 K.  For NPT Langevin barostat.  For NVT Nose thermostat.
+	do 2 istep=1,nstep
+	 do 3 iatom=1,natom
+	  do 4 j=1,3
+	   vt(istep,iatom,j) = vt(istep,iatom,j) - vcm(j)
+4	  continue
+3	 continue
+2	continue
+
 	print '(a32,f12.5)', 'Average kinetic energy (eV/atom)',avke
 	print '(a27,f12.5)', 'Average temperature (K) ',temp
         pressureig = densitynum*1.e30*boltzk*temp*1.e-9
         print '(a27,f12.5)', 'Ideal gas pressure (GPa)',pressureig
-c	print*, 'Center of mass velocity, kinetic energy, temperature = ',vcm,cmke,tempcm
+	print*, 'Center of mass velocity, kinetic energy, temperature = ',vcm,cmke,tempcm
 	print '(a27,99f12.5)', 'Einstein frequencies (Thz)',(omega0(ia)/(2.*pi*femto*1.e12),ia=1,ntyp)
 	print '(a27,99f12.5)', 'Einstein frequencies (cm-1)',(omega0(ia)/(2.*pi*femto*cspeed),ia=1,ntyp)
         write(12,'(a27,f12.5)') 'Average Temperature (K)',temp
