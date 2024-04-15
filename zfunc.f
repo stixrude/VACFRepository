@@ -3,7 +3,7 @@
 	real tarr(nstepsp),vacf(nstepsp,ntypmxp)
         real vacfx(nstepsp,ntypmxp,3)
 	integer, parameter :: mintz=7
-        common /zcom/ jtyp,kxyz,nintegrate,freq,dtime,tarr,vacf,vacfx
+        common /zcom/ jtyp,kxyz,nintegrate,freq,tarr,vacf,vacfx
 	pi = 4.0*atan(1.0)
 
 	call hunt(tarr,nintegrate+1,t,jlo)

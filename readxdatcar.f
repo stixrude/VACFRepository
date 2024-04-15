@@ -35,6 +35,8 @@
           end if
 1421     continue
 142     continue
+        print '(1x,a16,i3)', 'number of types ',n
+        write(12,'(1x,a16,i3)') 'number of types ',n
         print '(1x,a11,100a3)', 'atom types ',(atom(iatom),iatom=1,n)
         write(12,'(1x,a11,100a3)') 'atom types ',(atom(iatom),iatom=1,n)
         print*, 'atom masses ',(wmass(iatom),iatom=1,n)

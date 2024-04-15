@@ -17,7 +17,7 @@
 	real fpmean(ntypmxp),ppmean(ntypmxp),sigfp(ntypmxp),sigpp(ntypmxp),vtmp(3,natomsp)
 	external zfunc,zzfunc
 	common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
-	common /zcom/ jtyp,kxyz,nintegrate,freq,dtime,tarr,vacf,vacfx
+	common /zcom/ jtyp,kxyz,nintegrate,freq,tarr,vacf,vacfx
 	parameter (evk = 11605., elem=1.6021766208e-19)
 	parameter (femto=1.e-15)
 	parameter (gammax=0.545, iseed=5)
@@ -25,7 +25,6 @@
         parameter (THz=1./femto*1.e-12)
 	real cof(mint),xut(mint),xold,xu(3,mint),xc(3,mint),xctemp(3),xutemp(3)
 	pi = 4.0*atan(1.0)
-	dtime = potim
 	freqconversion = Wavenumbers
 	if (LTHz) freqconversion = THz
 	print*, 'frequency conversion = ',freqconversion
@@ -57,6 +56,8 @@ C  Assign valence to atoms for Nernst-Einstein conductivity calculation.
 
 	ibeg = nstep/ratio
 	nseg = nstep - ibeg
+	print*, 'Beginning time step and number of time steps',ibeg,nseg
+	write(12,*) 'Beginning time step and number of time steps',ibeg,nseg
 c  By setting nintmax to a large number full range to maximimize spectral resolution.  Take care of increasing noise in vacf at large intervals with damping
 	nintegrate = min(nintmax,nseg)
 C  Analyze nintegrate in terms of the periodic propagation of sound waves (cf. Haile, "Molecular Dynamics Simulation", Wiley, 1992, pg. 86, eq. 2.115)
@@ -250,7 +251,6 @@ C  Loop over time origins
 165      vacfint(istep,jtyp) = 0.
 	  do 17 iatom=1,natom
 	   do 18 j=1,3
-	    tarr(int+1) = int*potim
 	    add = vt(istep,iatom,j)*vt(istep+int,iatom,j)
 	    vacfint(istep,ityp(iatom)) = vacfint(istep,ityp(iatom)) + add/float(natyp(ityp(iatom)))
 	    vacf(int+1,ityp(iatom)) = vacf(int+1,ityp(iatom)) + add/float(nseg+1-int)/float(natyp(ityp(iatom)))
@@ -320,7 +320,7 @@ C  N>M and must be a power of 2.  Recommendation is N>4M (comment immediately pr
 	end if
 	print*, 'nintegrate,ndft,nfreq = ',nintegrate,ndft,nfreq
 C  Gaussian damping defined so that damping=0.1 at t=dampfactor
-	damp = potim*dampfactor/sqrt(log(10.))
+	damp = dampfactor/sqrt(log(10.))
 	call srand(iseed)
 	do 223 int=iint,nnint
          time = float(int)*potim
@@ -452,14 +452,14 @@ C  Calculate normalized diffusivity, Delta.  Eq. 11 frenchetal_16.  Assume that 
 	 delta(jtyp) = 2./3.*z(1,jtyp)*femto*sqrt(pi*boltzk*temp/(wmass(jtyp)/1000./avn))*(natyp(jtyp)/vatyp(jtyp))**(1./3.)
      &     *(6./pi)**(2./3.)*1.e10
 C  Use moments computed from trajectory
-	 if (fmomx(2,jtyp) .gt. 0.) fmom(2,jtyp) = fmomx(2,jtyp)
-	 if (fmomx(3,jtyp) .gt. 0.) fmom(3,jtyp) = fmomx(3,jtyp)
-	 if (fmomx(4,jtyp) .gt. 0.) fmom(4,jtyp) = fmomx(4,jtyp)
-	 if (fmomx(5,jtyp) .gt. 0.) fmom(5,jtyp) = fmomx(5,jtyp)
-	 fmom(2,jtyp) = fmomx(2,jtyp)
-	 fmom(3,jtyp) = fmomx(3,jtyp)
-	 fmom(4,jtyp) = fmomx(4,jtyp)
-	 fmom(5,jtyp) = fmomx(5,jtyp)
+c	 if (fmomx(2,jtyp) .gt. 0.) fmom(2,jtyp) = fmomx(2,jtyp)
+c	 if (fmomx(3,jtyp) .gt. 0.) fmom(3,jtyp) = fmomx(3,jtyp)
+c	 if (fmomx(4,jtyp) .gt. 0.) fmom(4,jtyp) = fmomx(4,jtyp)
+c	 if (fmomx(5,jtyp) .gt. 0.) fmom(5,jtyp) = fmomx(5,jtyp)
+c	 fmom(2,jtyp) = fmomx(2,jtyp)
+c	 fmom(3,jtyp) = fmomx(3,jtyp)
+c	 fmom(4,jtyp) = fmomx(4,jtyp)
+c	 fmom(5,jtyp) = fmomx(5,jtyp)
 C  Compute theoretical VACF of the form sech(at)cos(bt) after Isbister and McQuarrie (1972) J. Chem. Phys. 56, 736.
 	 C = fmom(3,jtyp)/fmom(2,jtyp)**2
 	 asec(jtyp) = 0.5*sqrt((C - 1.)*fmom(2,jtyp))
@@ -610,10 +610,10 @@ c	go to 52
 	 d0 = delta(jtyp)
 	 z0 = z(1,jtyp)
          zfind = z0/1000.
-	 zfind = 0.001
+c	 zfind = 0.001
          call hunt(z(1,jtyp),nfreq,zfind,jlo)
 	 ffind = df*float(jlo-1)
-	print*, 'Match at this frequency (cm-1)',ffind/(femto*cspeed)
+	print*, 'Match at this frequency (cm-1)',jtyp,ffind/(femto*cspeed),zfind
 	 ibtyp = 0
 	 call bfindm(Ba(jtyp),Aa(jtyp),fgas(jtyp))
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
