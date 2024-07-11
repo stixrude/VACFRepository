@@ -14,7 +14,7 @@
 	real zgas(nstepsp,ntypmxp),zsol(nstepsp,ntypmxp),fmom(5,ntypmxp),fmom0(5),tarr(nstepsp),fmomx(5,ntypmxp)
 	real formz(natomsp),diff(ntypmxp),sdiff(ntypmxp),omega0(ntypmxp),omega1(ntypmxp),taumem(ntypmxp)
 	real vacfmem(ntypmxp),asec(ntypmxp),bsec(ntypmxp),fpa(ntypmxp),ppa(ntypmxp),fp(nstepsp,ntypmxp),pp(nstepsp,ntypmxp)
-	real fpmean(ntypmxp),ppmean(ntypmxp),sigfp(ntypmxp),sigpp(ntypmxp),vtmp(3,natomsp)
+	real fpmean(ntypmxp),ppmean(ntypmxp),sigfp(ntypmxp),sigpp(ntypmxp),vtmp(3,natomsp),scale(ntypmxp),sumscale
 	external zfunc,zzfunc
 	common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
 	common /zcom/ jtyp,kxyz,nintegrate,freq,tarr,vacf,vacfx
@@ -23,7 +23,7 @@
 	parameter (gammax=0.545, iseed=5)
         parameter (Wavenumbers=1./femto/cspeed)
         parameter (THz=1./femto*1.e-12)
-	real cof(mint),xut(mint),xold,xu(3,mint),xc(3,mint),xctemp(3),xutemp(3)
+	real cof(mint),xut(mint),xold,xu(3,mint),xc(3,mint),xctemp(3),xutemp(3),dxut(mint),dtarr(mint)
 	pi = 4.0*atan(1.0)
 	freqconversion = Wavenumbers
 	if (LTHz) freqconversion = THz
@@ -46,8 +46,25 @@
 921	continue
 
 C  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et al. (2012) PCCP Eq. 19.
+	sumscale = 0.
+	do 221 i=1,ntyp
+	 scale(i) = 1.0
+221	continue
+C  Optionally read in scale factors of frenchetal_16 Eq. 18.  These must appear one per line in the same order as the atoms in the XDATCAR file.
+C  If the file scale.txt does not exist, reatin the one-fluid approximation.
+	open(2,file='scale.txt',status='old',err=2210)
+	print*, 'Reading scale factors from file'
+	do 2211 i=1,ntyp
+	 read(2,*) scale(i)
+2211	continue
+	print*, (scale(i),i=1,ntyp)
+2210	continue
+	do 220 i=1,ntyp
+	 sumscale = sumscale + natyp(i)*scale(i)
+220	continue
 	do 21 i=1,ntyp
 	 vatyp(i) = vol*natyp(i)/natom
+	 vatyp(i) = vol*natyp(i)*scale(i)/sumscale
 21	continue
 C  Assign valence to atoms for Nernst-Einstein conductivity calculation.
         do 22 iatom=1,natom
@@ -99,9 +116,12 @@ c	   xctemp = matmul(at(klo,:,:),xutemp)
 	   do 182 mstep=1,mint
 cxc	    xut(mstep) = xu(j,mstep)
 	    xut(mstep) = xc(j,mstep)
+	    dxut(mstep) = xut(mstep) - xut(1)
+	    dtarr(mstep) = tarr(klo+mstep-1) - tarr(klo)
 182	   continue
 C  Find coefficients of the interpolating polynomial
            call polcof(tarr(klo),xut(1),mint,cof)
+c           call polcof(dtarr(1),dxut(1),mint,cof)
 	   vti = 0.
 	   vtpi = 0.
 	   vtppi = 0.
@@ -117,6 +137,12 @@ C  Compute time derivatives
 181	   continue
 cxc	   vt(istep,iatom,j) = a(j,j)*vti
 	   vt(istep,iatom,j) = vti
+	   if (time .eq. 500 .and. iatom .eq. 1 .and. j .eq. 1) then
+	    write(99,*) (tarr(k),k=klo,klo+mint-1)
+	    write(99,*) (xut(k),k=1,mint)
+	    write(99,*) (cof(k),k=1,5)
+	    write(99,*) vti,vtpi,vtppi,vtpppi
+	   end if
 C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarrie (1972) J. Chem. Phys., 56, 736, Eq. 4 and Desjarlais (2013) Eq. 21.
 	   if (istep .ge. ibeg) then
 cxc	    fmomx(2,ityp(iatom)) = fmomx(2,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpi)**2

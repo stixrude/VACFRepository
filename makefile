@@ -21,7 +21,7 @@ SUBS = \
 parse.o skip.o vcell.o cross.o gdot.o flyv.o gamfind.o cage.o zbrent.o gameq.o wofz.o \
 broydn.o funcv.o bfind2.o bfind4.o fdjac.o fmin.o lnsrch.o qrdcmp.o qrupdt.o rsolv.o rotate.o \
 zfunc.o qromb.o polint.o hunt.o trapzd.o zzfunc.o dftint.o dftcor.o realft.o four1.o \
-zgasfunc.o bcalc.o bfindm.o polcof.o formzfunc.o gasdev.o readxdatcar.o
+zgasfunc.o bcalc.o bfindm.o polcof.o formzfunc.o gasdev.o readxdatcar.o polcoe.o
 
 # LIB1 = /afs/lsa.umich.edu/group/geo/users/stixrude/NUMRECSGI/libsginumrec.a
 # LIB1 = /big3/crlb/FORCES/,subroutines/libnumrec.a
