@@ -1,19 +1,25 @@
 C The ratio of the total number of time steps to the transient number of time steps
-        parameter (ratio = 1.2)
+        parameter (ratio = 2.0)
 C Maximum number of atom types, time steps, atoms, equilibrium time steps
-	parameter (ntypmxp=10, nstepsp=41000, natomsp=200, nstepavp=nstepsp*(1.-1./ratio))
+	parameter (ntypmxp=10, nstepsp=41000, natomsp=250, nstepavp=nstepsp*(1.-1./ratio))
 C Needed by const.inc for unit matrix dimensions etc.
         integer, parameter :: npmax=100
 C Parameters controlling the computation of the Velocity Autocorrelation Function (VACF)
 C     time step
-	real, parameter :: potim = 0.1
+	real, parameter :: potim = 0.5
 C     order of polynomial interpolation of trajectory from which velocities are computed
 	integer, parameter :: mint = 4
 C     maxmimum number of time steps in VACF.  Note: you want this to be equal to the full time series in order to maximize spectral resolution.
 	integer, parameter :: nintmax = nstepsp
 C     time scale for damping of VACF in fs: VACF will be multiplied by 0.1 at time=dampfactor
-	real, parameter :: dampfactor = 500.
+	real, parameter :: dampfactor = 200.
 C     when solid=true, the gas fraction(s) is(are) set exactly to zero
 	logical, parameter :: solid = .FALSE.
 C     choice of frequency units in output, either THz (LTHz=T) or wavenumbers (LTHz=F)
 	logical, parameter :: LTHz = .FALSE.
+C     choice of gas-like contribution: 2=2 moment method, 4=4 moment method, 6=matching method
+	integer, parameter :: entgaschoose = 6
+C     Use the moments computed from the trajectories
+	logical, parameter :: trajectorymom = .TRUE.
+C     Matching criterion: match at frequency f_match given by z(f_match) = z(0)/zmatchfac
+	double precision, parameter :: zmatchfac = 8806.

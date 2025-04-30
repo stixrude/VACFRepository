@@ -1,5 +1,6 @@
 	include 'P1'
 	include 'const.inc'
+	logical broydncheck
 	character*80 lab,header
 	character*80 subs(100)
 	character*2 atom(ntypmxp)
@@ -15,6 +16,8 @@
 	real formz(natomsp),diff(ntypmxp),sdiff(ntypmxp),omega0(ntypmxp),omega1(ntypmxp),taumem(ntypmxp)
 	real vacfmem(ntypmxp),asec(ntypmxp),bsec(ntypmxp),fpa(ntypmxp),ppa(ntypmxp),fp(nstepsp,ntypmxp),pp(nstepsp,ntypmxp)
 	real fpmean(ntypmxp),ppmean(ntypmxp),sigfp(ntypmxp),sigpp(ntypmxp),vtmp(3,natomsp),scale(ntypmxp),sumscale
+	real Wa2(ntypmxp),Wa4(ntypmxp),Wam(ntypmxp),Aa2(ntypmxp),Aa4(ntypmxp),Aam(ntypmxp),Ba2(ntypmxp),Ba4(ntypmxp),Bam(ntypmxp)
+	real fgas2(ntypmxp),fgas4(ntypmxp),fgasm(ntypmxp)
 	external zfunc,zzfunc
 	common /momcom/ ibtyp,ffind,zfind,z0,g0,d0,f0,fmom0
 	common /zcom/ jtyp,kxyz,nintegrate,freq,tarr,vacf,vacfx
@@ -51,13 +54,15 @@ C  Assume that N_alpha/V_alpha = N/V, i.e. the one-fluid approximation of Lai et
 	 scale(i) = 1.0
 221	continue
 C  Optionally read in scale factors of frenchetal_16 Eq. 18.  These must appear one per line in the same order as the atoms in the XDATCAR file.
-C  If the file scale.txt does not exist, reatin the one-fluid approximation.
+C  If the file scale.txt does not exist, revert to the one-fluid approximation.
 	open(2,file='scale.txt',status='old',err=2210)
 	print*, 'Reading scale factors from file'
+	write(12,*) 'Reading scale factors from file'
 	do 2211 i=1,ntyp
 	 read(2,*) scale(i)
 2211	continue
 	print*, (scale(i),i=1,ntyp)
+	write(12,*) (scale(i),i=1,ntyp)
 2210	continue
 	do 220 i=1,ntyp
 	 sumscale = sumscale + natyp(i)*scale(i)
@@ -143,7 +148,7 @@ cxc	   vt(istep,iatom,j) = a(j,j)*vti
 	    write(99,*) (cof(k),k=1,5)
 	    write(99,*) vti,vtpi,vtppi,vtpppi
 	   end if
-C  Compute moments of the vibrational density of states.  cf. Isbister & McQuarrie (1972) J. Chem. Phys., 56, 736, Eq. 4 and Desjarlais (2013) Eq. 21.
+C  Compute moments of the vibrational density of states from trajectories.  cf. Isbister & McQuarrie (1972) J. Chem. Phys., 56, 736, Eq. 4 and Desjarlais (2013) Eq. 21.
 	   if (istep .ge. ibeg) then
 cxc	    fmomx(2,ityp(iatom)) = fmomx(2,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtpi)**2
 cxc	    fmomx(3,ityp(iatom)) = fmomx(3,ityp(iatom)) + wmass(ityp(iatom))*(a(j,j)*vtppi)**2
@@ -447,6 +452,7 @@ c	 write(16,*) f*freqconversion,(z(i,jtyp)/4.,jtyp=1,ntyp)
 41	continue
 
 C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text following Eq. 21 in Desjarlais (2013): M_2n = <omega^(2n)>.
+	fmax = 1670.
 	do 43 jtyp=1,ntyp
 	 zfac = 1.0
 	 do 431 imom=1,5
@@ -456,6 +462,9 @@ C  Check sum rule and compute moments.  Eq. 2 and definition of moments in text 
 	  fac = 1.0
 	  if (i .eq. 1 .or. i .eq. nfreq) fac = 0.5
 	  f = df*float(i-1)
+C ->  For testing only.  Compute moments up to a maximum frequency fmax.
+c	  if (f .gt. fmax/freqconversion) go to 43
+C <-
 	  do 432 imom=1,5
 	   fmom(imom,jtyp) = fmom(imom,jtyp) + zfac*fac*z(i,jtyp)*(2.*pi*f)**(2.*(imom-1))*df
 432	  continue
@@ -478,14 +487,18 @@ C  Calculate normalized diffusivity, Delta.  Eq. 11 frenchetal_16.  Assume that 
 	 delta(jtyp) = 2./3.*z(1,jtyp)*femto*sqrt(pi*boltzk*temp/(wmass(jtyp)/1000./avn))*(natyp(jtyp)/vatyp(jtyp))**(1./3.)
      &     *(6./pi)**(2./3.)*1.e10
 C  Use moments computed from trajectory
+	if (trajectorymom) then
 c	 if (fmomx(2,jtyp) .gt. 0.) fmom(2,jtyp) = fmomx(2,jtyp)
 c	 if (fmomx(3,jtyp) .gt. 0.) fmom(3,jtyp) = fmomx(3,jtyp)
 c	 if (fmomx(4,jtyp) .gt. 0.) fmom(4,jtyp) = fmomx(4,jtyp)
 c	 if (fmomx(5,jtyp) .gt. 0.) fmom(5,jtyp) = fmomx(5,jtyp)
-c	 fmom(2,jtyp) = fmomx(2,jtyp)
-c	 fmom(3,jtyp) = fmomx(3,jtyp)
-c	 fmom(4,jtyp) = fmomx(4,jtyp)
-c	 fmom(5,jtyp) = fmomx(5,jtyp)
+	 print*, 'Using moments computed from trajectories'
+	 write(12,*) 'Using moments computed from trajectories'
+	 fmom(2,jtyp) = fmomx(2,jtyp)
+	 fmom(3,jtyp) = fmomx(3,jtyp)
+	 fmom(4,jtyp) = fmomx(4,jtyp)
+	 fmom(5,jtyp) = fmomx(5,jtyp)
+	end if
 C  Compute theoretical VACF of the form sech(at)cos(bt) after Isbister and McQuarrie (1972) J. Chem. Phys. 56, 736.
 	 C = fmom(3,jtyp)/fmom(2,jtyp)**2
 	 asec(jtyp) = 0.5*sqrt((C - 1.)*fmom(2,jtyp))
@@ -559,11 +572,15 @@ C  Feb. 12 2020.  Above statement is not correct.  SIG goes like -xfrac*log(debr
 C  With this exact result, smix is not an additional term and is no longer calculated since: -xfrac*log(n(jtyp)/V) = -xfrac*log(N/V*n(jtyp)/N) - -xfrac*log(N/V) - xfrac*log(xfrac)
 	SIG = 0.
 	do 46 jtyp=1,ntyp
-	 Ba(jtyp) = fmom(2,jtyp)
+	 Ba2(jtyp) = fmom(2,jtyp)
+	 Ba4(jtyp) = fmom(2,jtyp)
+	 Bam(jtyp) = fmom(2,jtyp)
 	 g0 = gamma(jtyp)
 	 d0 = delta(jtyp)
 	 z0 = z(1,jtyp)
-	 call bcalc(Aa(jtyp),Ba(jtyp),fgas(jtyp))
+c	 call bcalc(Aa2(jtyp),Ba2(jtyp),fgas2(jtyp))
+c	 call bcalc(Aa4(jtyp),Ba4(jtyp),fgas4(jtyp))
+c	 call bcalc(Aam(jtyp),Bam(jtyp),fgasm(jtyp))
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
 	 xfrac = float(natyp(jtyp))/float(natom)
 	 SIG = SIG + xfrac*(2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)))
@@ -571,25 +588,26 @@ C  With this exact result, smix is not an additional term and is no longer calcu
 461	 fmom0(imom) = fmom(imom,jtyp)
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0.) then
 	  ibtyp = 2
-	  call bfind2(Ba(jtyp),Aa(jtyp),fgas(jtyp))
-c	  print '(a15,i5,99e12.5)', 'bfind2',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
-	  Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+	  call bfind2(Ba2(jtyp),Aa2(jtyp),fgas2(jtyp),broydncheck)
+	  Wa2(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas2(jtyp)) 
 c	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
-	  entgas2 = entgas2 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
+	  entgas2 = entgas2 + Wa2(jtyp)*fgas2(jtyp)*natyp(jtyp)/natom
+	  print '(a10,l3,i5,99e12.5)', 'bfind2',broydncheck,jtyp,Aa2(jtyp),Ba2(jtyp),fgas2(jtyp),Wa2(jtyp),entgas2
+	  Ba4(jtyp) = Ba2(jtyp)
 	 else
 	   print*, 'Skipping 2 moment procedure'
 	 end if
 	 if (fmom0(2) .gt. 0. .and. fmom0(3) .gt. 0. .and. fmom0(4) .gt. 0. .and. fmom0(5) .gt. 0.) then
 	  ibtyp = 4
-	  call bfind4(Ba(jtyp),Aa(jtyp),fgas(jtyp))
-	  print '(a15,i5,99e12.5)', 'bfind4',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp)
-	  Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+	  call bfind4(Ba4(jtyp),Aa4(jtyp),fgas4(jtyp),broydncheck)
+	  Wa4(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas4(jtyp)) 
 c	  Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &             + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &             + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
-	  entgas4 = entgas4 + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
+	  entgas4 = entgas4 + Wa4(jtyp)*fgas4(jtyp)*natyp(jtyp)/natom
+	  print '(a10,l3,i5,99e12.5)', 'bfind4',broydncheck,jtyp,Aa4(jtyp),Ba4(jtyp),fgas4(jtyp),Wa4(jtyp),entgas4
 	 else
 	   print*, 'Skipping 4 moment procedure'
 	 end if
@@ -600,7 +618,7 @@ C  This follows the argument in Desjarlais (2013) (page 5, pp beginning "Having 
 C  Modify procedure of desjarlais_13 as follows:
 c  1.  Assume that fg=fghs (desharlais eq. 7).  
 c  2.  Assume that Ag is given by z(0) (desjarlais_13 Eq. 18)
-C  The following line skips this step and uses instead the moment matching result to compute zgas.
+C  The following line skips this step and goes to a different matching method.
 	go to 72
 	entgasm = 0.
 	do 71 jtyp=1,ntyp
@@ -609,49 +627,89 @@ C  The following line skips this step and uses instead the moment matching resul
 	 d0 = delta(jtyp)
 	 z0 = z(1,jtyp)
 	 f0 = fghs(jtyp)
-         zfind = z0/1000.
+         zfind = z0/zmatchfac
          call hunt(z(1,jtyp),nfreq,zfind,jlo)
 	 ffind = df*float(jlo-1)
 	 ibtyp = 1
-	 call bfindm(Ba(jtyp),Aa(jtyp),fgas(jtyp))
+	 call bfindm(Bam(jtyp),Aam(jtyp),fgasm(jtyp),broydncheck)
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
 	 xfrac = float(natyp(jtyp))/float(natom)
-	 Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+	 Wam(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgasm(jtyp)) 
 c	 Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &            + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &            + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
-	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
-	 print '(a15,i5,99e12.5)', 'bfindm modified',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp),Wa(jtyp),entgasm,gamma(jtyp)
+	 entgasm = entgasm + Wam(jtyp)*fgasm(jtyp)*natyp(jtyp)/natom
+	 print '(a10,l3,i5,99e12.5)', 'bfindm modified',broydncheck,jtyp,Aam(jtyp),Bam(jtyp),fgasm(jtyp),Wam(jtyp),entgasm
 71	continue
+	go to 52
 72	continue
 C  Find Ag, Bg, and fg so that the high frequency tail of the gas-like component matches the total density of states.  
 C  Do this by finding Bg such that f_gas*z_gas(f_match) = z(f_match) where f_match is given by: z(f_match) = z(0)/1000.
 C  This follows the argument in Desjarlais (2013) (page 5, pp beginning "Having demonstrated...")
 C  The following line skips this step and uses instead the moment matching result to compute zgas.
-c	go to 52
 	entgasm = 0.
 	do 51 jtyp=1,ntyp
 	 Ba(jtyp) = fmom(2,jtyp)
 	 g0 = gamma(jtyp)
 	 d0 = delta(jtyp)
 	 z0 = z(1,jtyp)
-         zfind = z0/1000.
+         zfind = z0/zmatchfac
 c	 zfind = 0.001
-         call hunt(z(1,jtyp),nfreq,zfind,jlo)
+C  March 1, 2025.  z(f)=zfind may be satisfied for multiple values f.  Hunt finds a solution, but difficult to know
+C  which one.  Use instead zhunt which finds the first occurence of z(f)=zfind with increasing frequency.
+c         call hunt(z(1,jtyp),nfreq,zfind,jlo)
+	 call zhunt(z(1,jtyp),nfreq,zfind,jlo)
 	 ffind = df*float(jlo-1)
-	print*, 'Match at this frequency (cm-1)',jtyp,ffind/(femto*cspeed),zfind
+C ->  For testing only.  Set by hand the frequency at which to match.
+c	 if (jtyp .eq. 3) then
+c	  ffind = 2220./freqconversion
+c	  jlo = ffind/df
+c	  zfind = z(jlo,jtyp)
+c	 end if
+C <-
+	print '(a30,i5,4f16.5)', 'Match at this frequency (cm-1)',jtyp,ffind/(femto*cspeed),zfind,z0,z0/zfind
+	write(12,'(a30,i5,4f16.5)') 'Match at this frequency (cm-1)',jtyp,ffind/(femto*cspeed),zfind,z0,z0/zfind
 	 ibtyp = 0
-	 call bfindm(Ba(jtyp),Aa(jtyp),fgas(jtyp))
+	 call bfindm(Bam(jtyp),Aam(jtyp),fgasm(jtyp),broydncheck)
 	 debrog = sqrt(hplanck**2/(2.*pi*wmass(jtyp)/1000./avn*boltzk*temp))
 	 xfrac = float(natyp(jtyp))/float(natom)
-	 Wa(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
+	 Wam(jtyp) = 2.5 - log(debrog**3/(vatyp(jtyp)*1.e-30)*natyp(jtyp)*fgasm(jtyp)) 
 c	 Wa(jtyp) = 2.5 - log(debrog**3/(vol*1.e-30)*natyp(jtyp)*fgas(jtyp)) 
      &            + log((1. + gamma(jtyp) + gamma(jtyp)**2 - gamma(jtyp)**3)/(1. - gamma(jtyp))**3) 
      &            + (3.*gamma(jtyp)**2 - 4.*gamma(jtyp))/(1. - gamma(jtyp))**2
-	 entgasm = entgasm + Wa(jtyp)*fgas(jtyp)*natyp(jtyp)/natom
-c	 print '(a15,i5,99e12.5)', 'bfindm',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp),Wa(jtyp),entgasm,gamma(jtyp)
+	 entgasm = entgasm + Wam(jtyp)*fgasm(jtyp)*natyp(jtyp)/natom
+	 print '(a10,l3,i5,99e12.5)', 'bfindm',broydncheck,jtyp,Aam(jtyp),Bam(jtyp),fgasm(jtyp),Wam(jtyp),entgasm
 51	continue
 52	continue
+	if (entgaschoose .eq. 2) print*, 'Total entropy based on 2 moment procedure (gas2)'
+	if (entgaschoose .eq. 4) print*, 'Total entropy based on 4 moment procedure (gas4)'
+	if (entgaschoose .eq. 6) print*, 'Total entropy based on matching procedure (gasm)'
+	if (entgaschoose .eq. 2) write(12,*) 'Total entropy based on 2 moment procedure (gas2)'
+	if (entgaschoose .eq. 4) write(12,*) 'Total entropy based on 4 moment procedure (gas4)'
+	if (entgaschoose .eq. 6) write(12,*) 'Total entropy based on matching procedure (gasm)'
+	do 53 jtyp=1,ntyp
+	 if (entgaschoose .eq. 2) then
+	  Aa(jtyp) = Aa2(jtyp)
+	  Ba(jtyp) = Ba2(jtyp)
+	  Wa(jtyp) = Wa2(jtyp)
+	  fgas(jtyp) = fgas2(jtyp)
+	  entgas = entgas2
+	 end if
+	 if (entgaschoose .eq. 4) then
+	  Aa(jtyp) = Aa4(jtyp)
+	  Ba(jtyp) = Ba4(jtyp)
+	  Wa(jtyp) = Wa4(jtyp)
+	  fgas(jtyp) = fgas4(jtyp)
+	  entgas = entgas4
+	 end if
+	 if (entgaschoose .eq. 6) then
+	  Aa(jtyp) = Aam(jtyp)
+	  Ba(jtyp) = Bam(jtyp)
+	  Wa(jtyp) = Wam(jtyp)
+	  fgas(jtyp) = fgasm(jtyp)
+	  entgas = entgasm
+	 end if
+53	continue
 	print '(a15,99f12.5)', 'sqrt(Ag) (cm-1)',(sqrt(Aa(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
 	write(12,'(a15,99f12.5)') 'sqrt(Ag) (cm-1)',(sqrt(Aa(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
 	print '(a15,99f12.5)', 'sqrt(Bg) (cm-1)',(sqrt(Ba(jtyp))/(2.*pi*femto*cspeed),jtyp=1,ntyp)
@@ -660,8 +718,6 @@ c	 print '(a15,i5,99e12.5)', 'bfindm',jtyp,Aa(jtyp),Ba(jtyp),fgas(jtyp),Wa(jtyp)
 	write(12,'(a15,99f12.5)') 'gas fractions:',(fgas(jtyp),jtyp=1,ntyp)
 	print '(a15,99f12.5)', 'Wa',(Wa(jtyp),jtyp=1,ntyp)
 	write(12,'(a15,99f12.5)') 'Wa',(Wa(jtyp),jtyp=1,ntyp)
-C  Prefer high frequency matching method of computing gas-like VDOS.
-	entgas = entgasm
 
 C  Compute gas VDOS Eq. 12 French et al. (2016)
         zz = 0.0
@@ -716,6 +772,7 @@ C  Compute solid entropy Eqs. 4,5,6
 	 if (.not. solid) smix = smix - xfrac*log(xfrac)
 61	continue
 	print*, 'smix = ',smix
+	write(12,*) 'smix = ',smix
 
 C  Compute total entropy
 	ent = entgas + entsol

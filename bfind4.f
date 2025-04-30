@@ -1,4 +1,4 @@
-	subroutine bfind4(Bg,Ag,fg)
+	subroutine bfind4(Bg,Ag,fg,check)
 	include 'P1'
 	include 'const.inc'
 	logical check

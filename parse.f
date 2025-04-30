@@ -2,6 +2,7 @@
 
 	character blank*1, string*80
 	character*80 subs(100)
+	integer n,ncstrg,i,i1,i2
 	integer nchar(100)
 	blank = ' '
 

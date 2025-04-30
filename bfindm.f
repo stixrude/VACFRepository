@@ -1,4 +1,4 @@
-	subroutine bfindm(Bg,Ag,fg)
+	subroutine bfindm(Bg,Ag,fg,check)
 	include 'P1'
 	include 'const.inc'
 	logical check

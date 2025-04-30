@@ -164,5 +164,6 @@ CU    USES fdjac,fmin,lnsrch,qrdcmp,qrupdt,rsolv
           if(test.lt.TOLX)return
         endif
 44    continue
-      pause 'MAXITS exceeded in broydn'
+c      pause 'MAXITS exceeded in broydn'
+      print*, 'WARNING: MAXITS exceeded in broydn'
       END
